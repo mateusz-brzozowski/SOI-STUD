@@ -41,7 +41,7 @@ z danej grupy.
 Przenoszenie do grupy `B` i `A` odbywa się przez użytkownika. W tym celu podobnie jak na laboratorium 1 zostanie
 utworzona funkcja `change_p_group`.
 
-## Weryfikacja poprawności rozwiązania
+## Weryfikacja poprawności rozwiązaniahas
 - Przenoszenie procesów pomiędzy grupami, możemy weryfikować poprzez wciśniecie na klawiaturze
 klawisza `F1` i przeanalizowaniu tablicy procesów. Będziemy wtedy mogli zweryfikować, czy procesy
 zmieniają się w tabeli.
@@ -67,7 +67,7 @@ procesy z grupy `B` mają dwa razy więcej czasu niż procesy z grupy `A`.
     - modyfikujemy funkcję `do_fork` ustawiamy zmienną `p_group` na wartość 0, dzięki temu proces będzie miał domyślną grupę `A`.
     - modyfikujemy funkcję `sys_task` dodajemy syscall'e do switcha.
     - implementujemy dwie funkcje `get_p_group`, która zwraca grupę procesu oraz `set_p_group`, która ustawia grupę procesowi.
-- `src/kernel/syste.c` dodajemy możliwość wyświetlania grupy w tablicy procesów `F1`. Zmieniamy nagłówek oraz dodajemy pole `g_group`.
+- `src/kernel/dmp.c` dodajemy możliwość wyświetlania grupy w tablicy procesów `F1`. Zmieniamy nagłówek oraz dodajemy pole `g_group`.
 - `src/kernel/clock.c` modyfikujemy funckję `do_clock` tak aby procesy z grupy `B` wykonywały się `2` razy częściej.
 
 ## Bootowanie
