@@ -184,6 +184,7 @@ PUBLIC unsigned int get_p_group()
 {
   message message;
   message = mm_in;
+  message.m1_i1 = who;
   return _taskcall(SYSTASK, SYS_GETPGROUP, &message);
 }
 
@@ -192,5 +193,6 @@ PUBLIC unsigned int set_p_group()
 {
   message message;
   message = mm_in;
+  message.m1_i1 = who;
   return _taskcall(SYSTASK, SYS_SETPGROUP, &message);
 }
