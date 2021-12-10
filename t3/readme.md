@@ -44,3 +44,85 @@ operacje P i V.
 Imię i Nazwisko: Mateusz Brzozowski\
 Nr. Indeksu: XXXXXXX
 
+# Przykładowe rozwiązanie zadania
+## Założenia
+- `5` semaforów <b>binarnych</b>
+    - jeden bufor ogólny:
+        - `mutex(1)`
+    - każdy dla każdej grupy (konsument parzysty/nieparzysty):
+        - `prodEven(0)`
+        - `prodOdd(0)`
+        - `consEven(0)`
+        - `consOdd(0)`
+- `4` zmiennne globalne
+
+## Implementaja
+```c
+//Kompilowanie:  g++ main.cpp -lpthread
+
+#include "monitor.h"
+
+unsigned int numOfProdEvenWating =  0;
+unsigned int numOfPordOddWating = 0;
+unsigned int numOfConsEvenWating =  0
+unsigned int numOfConsOddWating = 0;
+
+void prodEven(){
+    while(1){
+        mutex.P();
+        if(!canProdEven()){
+            numOfProdEvenWating++;
+            mutex.V();          // Do zakomentowania do testów żeby się zakleszczyło!
+            prodEven.P();
+            numOfProdEvenWating--;
+        }
+        buffer.push(generateEvenNumber());
+
+        if(canProdOdd() && numOfProdOddWating){
+            prodOdd.V();
+        }
+        else if(canConsEven && numOfConsEvenWating){
+            consEven.V();
+        }
+        else if(canConsOdd && numOfConsOddWating){
+            consOdd.V();
+        }
+        else{
+            mutex.V();
+        }
+
+        sleep(rand + CONST)
+    }
+}
+
+int main(){
+    //  po dwie sekcja:
+    pthread_create(&);
+    pthread_join(th[0], NULL);
+}
+```
+
+## Scenariusze testowe
+- sam producent parzysty:\
+uzupłeni `10` procesów `A1: Dodano 30...` i  następnie się zatrzymuje
+- sam producent nieparzsty:\
+nic nie powinno się stać
+- sam konsument parzysty:\
+nic nie powinno się stać
+- sam konstument nieparzysty:\
+nic nie powinno się stać
+- sami producenci:\
+Na zmianę dodają sie parzyste i nieparzyste, `A1 - 10`, `A2 - 9`, łączenie 19 `A1: Dodano 20 A2: Dodano 9`
+- sami konsumenci:\
+nic nie powinno się stać
+- normalny test, ze wszystkimi:\
+ma po psrostu działać
+- przykład zakleszczenia:
+    - `mutex(0)`\
+    lub
+    - zakomentować `mutex.v()` w każdym semaforze\
+`A1: Dodano 48`\
+`A2: Dodano 11`\
+i tyle. stop (zakleszczenie)
+
+<b>MA BYĆ 8 SCENARIUSZY TESTOWYCH</b>
