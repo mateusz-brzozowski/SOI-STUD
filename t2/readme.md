@@ -41,7 +41,7 @@ z danej grupy.
 Przenoszenie do grupy `B` i `A` odbywa się przez użytkownika. W tym celu podobnie jak na laboratorium 1 zostanie
 utworzona funkcja `change_p_group`.
 
-## Weryfikacja poprawności rozwiązaniahas
+## Weryfikacja poprawności rozwiązania
 - Przenoszenie procesów pomiędzy grupami, możemy weryfikować poprzez wciśniecie na klawiaturze
 klawisza `F1` i przeanalizowaniu tablicy procesów. Będziemy wtedy mogli zweryfikować, czy procesy
 zmieniają się w tabeli.
@@ -53,19 +53,20 @@ procesy z grupy `B` mają dwa razy więcej czasu niż procesy z grupy `A`.
 
 ## Zmodyfikowane pliki
 - `/include/minix/callnr.h` dodajemy dwa wywołania systemowe `GET_P_PROUP` oraz `SET_P_GROUP` oraz zwiększamy liczbę wywołań systemowych `NCALLS` o `2`.
-- `/include/minix/com.h` dodajemy syscole `SYS_GETPGROUP` oraz `SYS_SETPGROUP`.
+- `/include/minix/com.h` dodajemy taskcalle `SYS_GETPGROUP` oraz `SYS_SETPGROUP`.
 
 - `src/fs/table.c` dodajemy `no_sys` dla dodanych wywołań systemowych.
 
 - `src/mm/proto.h` dodajemy prototypy funkcji `get_p_group` oraz `set_p_group`.
 - `src/mm/table.c` dodajemy funckje do tablicy `get_p_group` oraz `set_p_group`.
-- `src/mm/main.c` implementujemy dwie funkcje `get_p_group`, która zwraca grupę procesu oraz `set_p_group`, która ustawia grupę procesowi.
+- `src/mm/main.c` dodajemy syscalle funkcji `get_p_group`, która zwraca grupę procesu oraz `set_p_group`, która ustawia grupę procesowi.
 
 - `src/kernel/proc.h` dodajemy zmienną `p_group` która zawiera grupę procesu.
 - `src/kernel/system.c` 
+    - obsługa syscalli:
     - na początku przekazyjemy prototypy funkcji `get_p_group` oraz `set_p_group`.
-    - modyfikujemy funkcję `do_fork` ustawiamy zmienną `p_group` na wartość 0, dzięki temu proces będzie miał domyślną grupę `A`.
     - modyfikujemy funkcję `sys_task` dodajemy syscall'e do switcha.
+    - modyfikujemy funkcję `do_fork` ustawiamy zmienną `p_group` na wartość 0, dzięki temu proces będzie miał domyślną grupę `A`.
     - implementujemy dwie funkcje `get_p_group`, która zwraca grupę procesu oraz `set_p_group`, która ustawia grupę procesowi.
 - `src/kernel/dmp.c` dodajemy możliwość wyświetlania grupy w tablicy procesów `F1`. Zmieniamy nagłówek oraz dodajemy pole `g_group`.
 - `src/kernel/clock.c` modyfikujemy funckję `do_clock` tak aby procesy z grupy `B` wykonywały się `2` razy częściej.
