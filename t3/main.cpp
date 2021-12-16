@@ -1,23 +1,20 @@
 // g++ main.cpp -lpthread
 
-#include <errno.h>
-#include <fcntl.h>
 #include <iostream>
-#include <pthread.h>
-#include <semaphore.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <vector>
 
 #include "monitor.h"
 
-#define SLEEP usleep(1000000 + rand() % 1000000)
-#define PRINT(x) std::cout << x << std::endl
+int num_of_prod_even_waiting = 0;
+int num_of_prod_odd_waiting = 0;
+int num_of_cons_even_waiting = 0;
+int num_of_cons_odd_waiting = 0;
+
+Semaphore mutex = Semaphore(1);
+Semaphore prod_even_mutex = Semaphore(0);
+Semaphore prod_odd_mutex = Semaphore(0);
+Semaphore cons_even_mutex = Semaphore(0);
+Semaphore cons_odd_mutex = Semaphore(0);
 
 class Buffer {
     std::vector<int> buffer;
@@ -47,7 +44,11 @@ public:
     }
 
     int countOdd() const{
-        return buffer.size() - countEven();
+        int counter = 0;
+        for(int i = 0; i < buffer.size(); i++)
+            if(buffer[i] % 2 == 1)
+                counter++;
+        return counter;
     }
 
     int check() const{
@@ -57,53 +58,34 @@ public:
     }
 };
 
-int num_of_prod_even_waiting = 0;
-int num_of_prod_odd_waiting = 0;
-int num_of_cons_even_waiting = 0;
-int num_of_cons_odd_waiting = 0;
-
-Semaphore mutex = Semaphore(1);
-Semaphore prod_even_mutex = Semaphore(0);
-Semaphore prod_odd_mutex = Semaphore(0);
-Semaphore cons_even_mutex = Semaphore(0);
-Semaphore cons_odd_mutex = Semaphore(0);
-
-Buffer my_buffer;
+Buffer fifo_buffer;
 
 bool canProdEven(){
-    if (my_buffer.countEven() < 10)
+    if (fifo_buffer.countEven() < 10)
         return true;
     return false;
 }
 
 bool canProdOdd(){
-    if (my_buffer.countEven() > my_buffer.countOdd())
+    if (fifo_buffer.countEven() > fifo_buffer.countOdd())
         return true;
     return false;
 }
 
 bool canConsEven(){
-    if(my_buffer.count() >= 3 && my_buffer.check() != -1 && my_buffer.check() % 2 == 0)
+    if(fifo_buffer.count() >= 3 && fifo_buffer.check() != -1 && fifo_buffer.check() % 2 == 0)
         return true;
     return false;
 }
 
 bool canConsOdd(){
-    if(my_buffer.count() >= 7 && my_buffer.check() != -1 && my_buffer.check() % 2 != 0)
+    if(fifo_buffer.count() >= 7 && fifo_buffer.check() != -1 && fifo_buffer.check() % 2 != 0)
         return true;
     return false;
 }
 
-int generateEvenNumber(){
-    return (rand() % (25 + 1)) * 2;
-}
-
-int generateOddNumber(){
-    return (rand() % (24 + 1)) * 2 + 1;
-}
-
 void* prodEven(void* arg){
-    while (1){
+    for(int even_number = 0;; even_number = (even_number +2) % 50){
         mutex.p();
         if(!canProdEven()){
             ++num_of_prod_even_waiting;
@@ -111,10 +93,8 @@ void* prodEven(void* arg){
             prod_even_mutex.p();
             --num_of_prod_even_waiting;
         }
-        int even_number = generateEvenNumber();
-        my_buffer.put(even_number);
-        std::string s = "A1: Dodano " + std::to_string(even_number);
-        PRINT(s);
+        fifo_buffer.put(even_number);
+        std::cout << "A1(" << fifo_buffer.countEven() << "): Dodano " << std::to_string(even_number) << std::endl;
         if(num_of_prod_odd_waiting > 0 && canProdOdd())
             prod_odd_mutex.v();
         else if(num_of_cons_even_waiting > 0 && canConsEven())
@@ -123,12 +103,12 @@ void* prodEven(void* arg){
            cons_odd_mutex.v();
         else
             mutex.v();
-        SLEEP;
+        usleep(1000000 + rand() % 1000000);
     }
 }
 
 void* prodOdd(void* arg){
-    while (1){
+    for(int odd_number = 1;; odd_number = (odd_number + 2) % 50){
         mutex.p();
         if(!canProdOdd()){
             ++num_of_prod_odd_waiting;
@@ -136,10 +116,8 @@ void* prodOdd(void* arg){
             prod_odd_mutex.p();
             --num_of_prod_odd_waiting;
         }
-        int odd_number = generateOddNumber();
-        my_buffer.put(odd_number);
-        std::string s = "A2: Dodano " + std::to_string(odd_number);
-        PRINT(s);
+        fifo_buffer.put(odd_number);
+        std::cout << "A2(" << fifo_buffer.countOdd() << "): Dodano " << std::to_string(odd_number) << std::endl;
         if(num_of_prod_even_waiting > 0 && canProdEven())
             prod_even_mutex.v();
         else if(num_of_cons_even_waiting > 0 && canConsEven())
@@ -148,7 +126,7 @@ void* prodOdd(void* arg){
            cons_odd_mutex.v();
         else
             mutex.v();
-        SLEEP;
+        usleep(1000000 + rand() % 1000000);
     }
 }
 
@@ -161,9 +139,8 @@ void* consEven(void* arg){
             cons_even_mutex.p();
             --num_of_cons_even_waiting;
         }
-        int value = my_buffer.get();
-        std::string s = "B1: Usunieto " + std::to_string(value);
-        PRINT(s);
+        int value = fifo_buffer.get();
+        std::cout << "B1: Usunieto " << std::to_string(value) << std::endl;
         if(num_of_cons_odd_waiting > 0 && canConsOdd())
             cons_odd_mutex.v();
         else if(num_of_prod_even_waiting > 0 && canProdEven())
@@ -172,7 +149,7 @@ void* consEven(void* arg){
             prod_odd_mutex.v();
         else
             mutex.v();
-        SLEEP;
+        usleep(1000000 + rand() % 1000000);
     }
 }
 
@@ -185,9 +162,8 @@ void* consOdd(void* arg){
             cons_odd_mutex.p();
             --num_of_cons_odd_waiting;
         }
-        int value = my_buffer.get();
-        std::string s = "B2: Usunieto " + std::to_string(value);
-        PRINT(s);
+        int value = fifo_buffer.get();
+        std::cout << "B2: Usunieto " << std::to_string(value) << std::endl;
         if(num_of_cons_even_waiting > 0 && canConsEven())
             cons_even_mutex.v();
         else if(num_of_prod_even_waiting > 0 && canProdEven())
@@ -196,7 +172,7 @@ void* consOdd(void* arg){
             prod_odd_mutex.v();
         else
             mutex.v();
-        SLEEP;
+        usleep(1000000 + rand() % 1000000);
     }
 }
 
