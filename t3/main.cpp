@@ -154,11 +154,15 @@ void* consEven(void* arg){
 }
 
 void* consOdd(void* arg){
+    bool lock = false;
+    if(arg != NULL)
+       lock = *(bool*)arg;
     while (1){
         mutex.p();
         if(!canConsOdd()){
             ++num_of_cons_odd_waiting;
-            mutex.v();
+            if(!lock)
+                mutex.v();
             cons_odd_mutex.p();
             --num_of_cons_odd_waiting;
         }
@@ -183,6 +187,7 @@ int main(int argc, char* argv[]){
     }
     srand(time(NULL));
     pthread_t th[4];
+    bool lock = true;
     switch (*argv[1])
     {
     case '0':
@@ -224,11 +229,10 @@ int main(int argc, char* argv[]){
         pthread_join(th[3], NULL);
         break;
     case '7':
-        // TUTAJ TRZEBA DODAĆ JAKIEŚ BLOKOWANIE!!
         pthread_create(&th[0], NULL, &prodEven, NULL);
         pthread_create(&th[1], NULL, &prodOdd, NULL);
         pthread_create(&th[2], NULL, &consEven, NULL);
-        pthread_create(&th[3], NULL, &consOdd, NULL);
+        pthread_create(&th[3], NULL, &consOdd, (void*) &lock);
         pthread_join(th[0], NULL);
         pthread_join(th[1], NULL);
         pthread_join(th[2], NULL);
