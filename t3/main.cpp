@@ -31,30 +31,30 @@ public:
         return value;
     }
 
+    int get_first() const{
+        if(buffer.empty())
+            return -1;
+        return buffer[0];
+    }
+
     int count() const{
         return buffer.size();
     }
 
     int countEven() const{
-        int counter = 0;
+        int even_values = 0;
         for(int i = 0; i < buffer.size(); i++)
             if(buffer[i] % 2 == 0)
-                counter++;
-        return counter;
+                even_values++;
+        return even_values;
     }
 
     int countOdd() const{
-        int counter = 0;
+        int odd_values = 0;
         for(int i = 0; i < buffer.size(); i++)
             if(buffer[i] % 2 == 1)
-                counter++;
-        return counter;
-    }
-
-    int check() const{
-        if(buffer.empty())
-            return -1;
-        return buffer[0];
+                odd_values++;
+        return odd_values;
     }
 };
 
@@ -73,13 +73,13 @@ bool canProdOdd(){
 }
 
 bool canConsEven(){
-    if(fifo_buffer.count() >= 3 && fifo_buffer.check() != -1 && fifo_buffer.check() % 2 == 0)
+    if(fifo_buffer.count() >= 3 && fifo_buffer.get_first() != -1 && fifo_buffer.get_first() % 2 == 0)
         return true;
     return false;
 }
 
 bool canConsOdd(){
-    if(fifo_buffer.count() >= 7 && fifo_buffer.check() != -1 && fifo_buffer.check() % 2 != 0)
+    if(fifo_buffer.count() >= 7 && fifo_buffer.get_first() != -1 && fifo_buffer.get_first() % 2 != 0)
         return true;
     return false;
 }
