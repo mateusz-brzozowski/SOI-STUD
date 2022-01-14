@@ -3,9 +3,9 @@
 #include <unistd.h>
 #include <lib.h>
 
-int worst_fit(int value) {
+int worst_fit(int alg) {
   message m;
-  m.m1_i1 = value;
+  m.m1_i1 = alg;
   return _syscall(MM, WORST_FIT, &m);
 }
 

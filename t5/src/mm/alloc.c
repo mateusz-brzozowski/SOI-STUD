@@ -101,8 +101,7 @@ PUBLIC phys_clicks alloc_mem(phys_clicks clicks) {
     }
     } while (swap_out());
   default:
-	panic("Invalid allocation algotirhm", alloc_alg);
-	return NO_MEM;
+	  return NO_MEM;
   }
 }
 
