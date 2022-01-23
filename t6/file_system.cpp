@@ -26,7 +26,7 @@ struct INode{
 struct DataBlock{
     u_int64_t offset;
 
-    u_int8_t data_link[DATA_BLOCK_SIZE];
+    u_int8_t data[DATA_BLOCK_SIZE];
 };
 
 struct DirectoryLink{
@@ -159,13 +159,11 @@ public:
             new_directory_link.inode_id = new_inode_idx;
             strncpy((char *)new_directory_link.name, current_directory, NAME_LENGTH);
 
-            if(!root->data_block_offset){
-                uint32_t new_data_block_idx = get_empty_data_block();
-                // TOOD: CHECK IF EXISTS
-                root->data_block_offset = new_data_block_idx;
-                *(DirectoryLink*)data_blocks[new_data_block_idx].data_link = new_directory_link;
-                data_maps[new_data_block_idx] = true;
-            }
+            uint32_t new_data_block_idx = get_empty_data_block();
+            // TOOD: CHECK IF EXISTS
+            root->data_block_offset = new_data_block_idx;
+            *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
+            data_maps[new_data_block_idx] = true;
         }
     }
 
@@ -190,6 +188,12 @@ private:
         return 0;
     }
 
+    DirectoryLink *get_directory_link(INode *direcotry, char *name){
+        for(int i = 0; i < inodes_length; i++){
+
+        }
+    }
+
     void load_lengths(SuperBlock super_block_){
         inodes_length = super_block_.inodes_count;
         data_maps_length = super_block_.unused_datablocks;
@@ -199,10 +203,12 @@ private:
 
 int main(int argc, char* argv[]) {
     VirtualDisc virtual_disc;
-    virtual_disc.set_name("test");
+    virtual_disc.set_name((char*)"test");
     virtual_disc.create((char*)"test", 1024*1024);
     virtual_disc.open();
-    virtual_disc.create_directory("katalog");
+    char direcotries[80];
+    strcpy(direcotries, "dupa/jasia/karuzela");
+    virtual_disc.create_directory(direcotries);
     // std::cout << virtual_disc.super_block.disc_size;
     // virtual_disc.create_directory((char *)"dupa");
     virtual_disc.close();
