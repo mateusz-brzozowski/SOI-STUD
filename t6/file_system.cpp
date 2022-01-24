@@ -203,17 +203,30 @@ public:
         }
     }
 
-    void show_files_tree(INode* directory_inode, unsigned prefix){
-        for (u_int64_t i = 0; i < inodes_length; i++){
-            if(inodes[i].data_block_index == -1)
-                break;
-            DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[i].data;
-            for(u_int64_t j = 0; j < DIRECTORY_LINKS_IN_DATA_BLOCK; j++){
-                if(!direcotry_links[j].used)
+    void show_files_tree(INode* directory_inode, int rec_lvl){
+        if(directory_inode->type != INodeType::DIRECTORY_NODE)
+            return;
+        u_int64_t current_data_block_idx = directory_inode->data_block_index;
+        while(current_data_block_idx != -1){
+            std::cout << "\n";
+            for(int i = 0; i < rec_lvl; i++)
+                std::cout << "  ";
+            DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
+            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+                if(!direcotry_links[idx].used)
                     continue;
-                std::cout << j << ". "<<direcotry_links[j].name << ", ";
+                std::cout << direcotry_links[idx].name << " ";
+                show_files_tree(&inodes[direcotry_links[idx].inode_id], rec_lvl + 1);
             }
+            std::cout << "\n";
+            for(int i = 0; i < rec_lvl - 1; i++)
+                std::cout << "  ";
+            current_data_block_idx = data_blocks[current_data_block_idx].offset;
         }
+    }
+
+    void file_to_disc(INode* directory_inode, char* file_name){
+        FILE *file_to_copy = fopen(file_name, "wb+");
     }
 
 private:
@@ -271,23 +284,30 @@ int main(int argc, char* argv[]) {
     virtual_disc.set_name((char*)"test");
     virtual_disc.create((char*)"test", 1024*1024);
     virtual_disc.open();
+    virtual_disc.create_directory("a");
+    virtual_disc.create_directory("b");
+    virtual_disc.create_directory("c");
     char direcotries[80];
-    strcpy(direcotries, "a/b/c");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/b/d");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/b/e");
-    virtual_disc.create_directory(direcotries);
     strcpy(direcotries, "a/x");
     virtual_disc.create_directory(direcotries);
     strcpy(direcotries, "a/y");
     virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/y/k");
+    strcpy(direcotries, "a/z");
     virtual_disc.create_directory(direcotries);
-    for(int i = 0; i < 64; i++){
-        sprintf(direcotries, "%d", i);
-        virtual_disc.create_directory(direcotries);
-    }
+    strcpy(direcotries, "a/x/k");
+    virtual_disc.create_directory(direcotries);
+    strcpy(direcotries, "a/x/l");
+    virtual_disc.create_directory(direcotries);
+    strcpy(direcotries, "a/x/m");
+    virtual_disc.create_directory(direcotries);
+    strcpy(direcotries, "a/y/q");
+    virtual_disc.create_directory(direcotries);
+    strcpy(direcotries, "a/y/w");
+    virtual_disc.create_directory(direcotries);
+    // for(int i = 0; i < 64; i++){
+    //     sprintf(direcotries, "%d", i);
+    //     virtual_disc.create_directory(direcotries);
+    // }
     virtual_disc.show_files_tree(&virtual_disc.inodes[0], 0);
     // std::cout << virtual_disc.super_block.disc_size;
     // virtual_disc.create_directory((char *)"dupa");
