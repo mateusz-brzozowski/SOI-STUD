@@ -176,27 +176,7 @@ public:
                     *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
                     data_maps[new_data_block_idx] = true;
                 } else{
-                    u_int64_t current_data_block_idx = current_direcotry_inode->data_block_index;
-                    bool is_place_for_link = false;
-                    while(!is_place_for_link){
-                        DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-                        for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
-                            if(!direcotry_links[idx].used){
-                                direcotry_links[idx] = new_directory_link;
-                                is_place_for_link = true;
-                                break;
-                            }
-                        }
-                        if(is_place_for_link)
-                            break;
-                        if(data_blocks[current_data_block_idx].offset){
-                            current_data_block_idx = data_blocks[current_data_block_idx].offset;
-                        } else{
-                            u_int64_t new_data_block_idx = get_empty_data_block();
-                            data_blocks[current_data_block_idx].offset = new_data_block_idx;
-                            data_maps[current_data_block_idx] = true;
-                        }
-                    }
+                    add_link_to_inode(current_direcotry_inode, new_directory_link);
                 }
                 current_direcotry_inode = &inodes[new_inode_idx];
             }
@@ -215,7 +195,11 @@ public:
             for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(!direcotry_links[idx].used)
                     continue;
-                std::cout << direcotry_links[idx].name << " ";
+
+                if (inodes[direcotry_links[idx].inode_id].type == INodeType::DIRECTORY_NODE)
+                    std:: cout << "\x1B[34m" << direcotry_links[idx].name << "\033[0m ";
+                else
+                    std::cout << direcotry_links[idx].name << " ";
                 show_files_tree(&inodes[direcotry_links[idx].inode_id], rec_lvl + 1);
             }
             std::cout << "\n";
@@ -231,7 +215,56 @@ public:
             std::cerr << "Invalid path";
             exit(EXIT_FAILURE);
         }
-        file_to_inode(direcotry_inode, file_name);
+        if(get_inode_in_inode(direcotry_inode, file_name)){
+            std::cerr << "FIle alraedy exists";
+            exit(EXIT_FAILURE);
+        }
+
+        u_int64_t new_inode_idx = get_empty_inode();
+        // TODO: CHECK IF EXISTS
+        inodes[new_inode_idx].reference_count = 1;
+        inodes[new_inode_idx].type = INodeType::FILE_NODE;
+        inodes[new_inode_idx].size = 0;
+
+        DirectoryLink new_file_link{};
+        new_file_link.used = true;
+        new_file_link.inode_id = new_inode_idx;
+        strncpy((char *)new_file_link.name, file_name, NAME_LENGTH);
+
+        add_link_to_inode(direcotry_inode, new_file_link);
+
+        FILE *file = fopen(file_name, "rb+");
+
+        inodes[new_inode_idx].data_block_index = get_empty_data_block();
+        u_int64_t current_data_block_idx = inodes[new_inode_idx].data_block_index;
+        while(current_data_block_idx != -1){
+            unsigned left_size_in_block = 0;
+            unsigned read_size = 0;
+            while(left_size_in_block < DATA_BLOCK_SIZE){
+                read_size = fread(data_blocks[current_data_block_idx].data, 1, DATA_BLOCK_SIZE - left_size_in_block, file);
+                if(!read_size && feof(file)){
+                    break;
+                }
+                else if (!read_size){
+                    std::cerr << "Invalid file";
+                    exit(EXIT_FAILURE);
+                }
+                left_size_in_block += read_size;
+                inodes[new_inode_idx].size += read_size;
+            }
+            if(!left_size_in_block){
+                remove_data_block_from_inode(&inodes[new_inode_idx], current_data_block_idx);
+                current_data_block_idx = -1;
+            } else if (feof(file)){
+                data_maps[current_data_block_idx] = true;
+                data_blocks[current_data_block_idx].offset = -1;
+                current_data_block_idx = -1;
+            } else {
+                data_maps[current_data_block_idx] = true;
+                data_blocks[current_data_block_idx].offset = get_empty_data_block();
+                current_data_block_idx = data_blocks[current_data_block_idx].offset;
+            }
+        }
     }
 
 private:
@@ -283,29 +316,44 @@ private:
         datablocks_length = super_block_.unused_datablocks;
     }
 
-    void file_to_inode(INode* directory_inode, char *file_name){
-        FILE *file = fopen(file_name, "rb+");
-
-        u_int64_t new_inode_idx = get_empty_inode();
-        // TODO: CHECK IF EXISTS
-        inodes[new_inode_idx].reference_count = 1;
-        inodes[new_inode_idx].type = INodeType::FILE_NODE;
-
-        DirectoryLink new_file_link{};
-        new_file_link.used = true;
-        new_file_link.inode_id = new_inode_idx;
-        strncpy((char *)new_file_link.name, file_name, NAME_LENGTH);
-
-        u_int64_t current_data_block_idx = directory_inode->data_block_index;
-        while(current_data_block_idx != -1){
+    void add_link_to_inode(INode* inode, DirectoryLink directory_link){
+        u_int64_t current_data_block_idx = inode->data_block_index;
+        bool is_place_for_link = false;
+        while(!is_place_for_link){
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
             for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
-                if(!direcotry_links[idx].used)
-                    direcotry_links[idx] = new_file_link;
+                if(!direcotry_links[idx].used){
+                    direcotry_links[idx] = directory_link;
+                    is_place_for_link = true;
+                    break;
+                }
+            }
+            if(is_place_for_link)
+                break;
+            if(data_blocks[current_data_block_idx].offset){
+                current_data_block_idx = data_blocks[current_data_block_idx].offset;
+            } else{
+                u_int64_t new_data_block_idx = get_empty_data_block();
+                data_blocks[current_data_block_idx].offset = new_data_block_idx;
+                data_maps[current_data_block_idx] = true;
+            }
+        }
+    }
+
+    void remove_data_block_from_inode(INode* inode, u_int64_t data_block_idx){
+        u_int64_t current_data_block_idx = inode->data_block_index;
+        // TODO: REMOVE THIS IF
+        if(current_data_block_idx == data_block_idx){
+            inode->data_block_index = -1;
+            return;
+        }
+        while(current_data_block_idx != -1){
+            if(current_data_block_idx == data_block_idx){
+                data_blocks[current_data_block_idx].offset = -1;
+                return;
             }
             current_data_block_idx = data_blocks[current_data_block_idx].offset;
         }
-
     }
 
     INode *get_direcotry_inode(char *path){
@@ -337,6 +385,7 @@ int main(int argc, char* argv[]) {
     virtual_disc.create_directory("b");
     virtual_disc.create_directory("c");
     char direcotries[80];
+    char file[80];
     strcpy(direcotries, "a/x");
     virtual_disc.create_directory(direcotries);
     strcpy(direcotries, "a/y");
@@ -354,7 +403,12 @@ int main(int argc, char* argv[]) {
     strcpy(direcotries, "a/y/w");
     virtual_disc.create_directory(direcotries);
 
+    strcpy(direcotries, "a/x");
+    strcpy(file, "matejko");
+    virtual_disc.file_to_disc(direcotries, file);
+
     virtual_disc.show_files_tree(&virtual_disc.inodes[0], 0);
+
     // for(int i = 0; i < 64; i++){
     //     sprintf(direcotries, "%d", i);
     //     virtual_disc.create_directory(direcotries);
