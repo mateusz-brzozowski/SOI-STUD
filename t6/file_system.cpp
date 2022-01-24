@@ -6,6 +6,7 @@
 #define DATA_BLOCK_SIZE 8192
 #define NAME_LENGTH 16
 #define FILES_SPACE 8
+#define DIRECTORY_LINKS_IN_DATA_BLOCK (DATA_BLOCK_SIZE / sizeof(DirectoryLink))
 
 #pragma region structures
 
@@ -17,7 +18,7 @@ enum INodeType{
 
 struct INode{
     u_int64_t size;
-    u_int64_t data_block_offset;
+    u_int64_t data_block_index;
 
     u_int8_t type;
     u_int8_t reference_count;
@@ -91,6 +92,7 @@ public:
 
         INode root{};
         root.type = INodeType::DIRECTORY_NODE;
+        root.data_block_index = -1;
         root.reference_count = 1;
         super_block.unused_inodes -= 1;
 
@@ -99,6 +101,7 @@ public:
 
         for(int i = 0; i < inodes_length - 1; i++){
             INode inode{};
+            inode.data_block_index = -1;
             fwrite(&inode, sizeof(INode), 1, file);
         }
 
@@ -109,6 +112,7 @@ public:
 
         for(int i = 0; i < datablocks_length; i++){
             DataBlock data_block{};
+            data_block.offset = -1;
             fwrite(&data_block, sizeof(DataBlock), 1, file);
         }
 
@@ -141,29 +145,78 @@ public:
     }
 
     void create_directory(char *path){
-        INode *root = inodes;
-        char *current_directory = strtok(path, "/");
-        for(current_directory; current_directory != NULL; current_directory = strtok(NULL, "/")){
-            if(!is_valid_name(current_directory)){
-                std::cerr << "Invalid directory name: " << current_directory << "\n";
+        INode *current_direcotry_inode = inodes;
+        char *current_directory_name = strtok(path, "/");
+        for(current_directory_name; current_directory_name != NULL; current_directory_name = strtok(NULL, "/")){
+            if(!is_valid_name(current_directory_name)){
+                std::cerr << "Invalid directory name: " << current_directory_name << "\n";
                 exit(EXIT_FAILURE);
             }
 
-            uint32_t new_inode_idx = get_empty_inode();
-            // TODO: CHECK IF EXISTS
-            inodes[new_inode_idx].reference_count = 1;
-            inodes[new_inode_idx].type = INodeType::DIRECTORY_NODE;
+            INode* next = get_inode_in_inode(current_direcotry_inode, current_directory_name);
 
-            DirectoryLink new_directory_link{};
-            new_directory_link.used = true;
-            new_directory_link.inode_id = new_inode_idx;
-            strncpy((char *)new_directory_link.name, current_directory, NAME_LENGTH);
+            if(next && next->type == INodeType::DIRECTORY_NODE){
+                current_direcotry_inode = next;
+            } else if (next){
+                std::cerr << "Missing directory: " << next << "\n";
+                return;
+            } else{
+                u_int64_t new_inode_idx = get_empty_inode();
+                // TODO: CHECK IF EXISTS
+                inodes[new_inode_idx].reference_count = 1;
+                inodes[new_inode_idx].type = INodeType::DIRECTORY_NODE;
 
-            uint32_t new_data_block_idx = get_empty_data_block();
-            // TOOD: CHECK IF EXISTS
-            root->data_block_offset = new_data_block_idx;
-            *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
-            data_maps[new_data_block_idx] = true;
+                DirectoryLink new_directory_link{};
+                new_directory_link.used = true;
+                new_directory_link.inode_id = new_inode_idx;
+                strncpy((char *)new_directory_link.name, current_directory_name, NAME_LENGTH);
+
+                if(current_direcotry_inode->data_block_index == -1){
+                    u_int64_t new_data_block_idx = get_empty_data_block();
+                    // TOOD: CHECK IF EXISTS
+                    current_direcotry_inode->data_block_index = new_data_block_idx;
+                    *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
+                    data_maps[new_data_block_idx] = true;
+                } else{
+                    u_int64_t current_data_block_idx = current_direcotry_inode->data_block_index;
+                    u_int64_t last_data_block_idx = current_data_block_idx;
+                    bool is_place_for_link = false;
+                    while(current_data_block_idx != -1){
+                        DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
+                        for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+                            if(!direcotry_links[idx].used){
+                                direcotry_links[idx] = new_directory_link;
+                                is_place_for_link = true;
+                                break;
+                            }
+                        }
+                        if(data_blocks[current_data_block_idx].offset){
+                            last_data_block_idx = current_data_block_idx;
+                        }
+                        current_data_block_idx = data_blocks[current_data_block_idx].offset;
+                    }
+                    if(!is_place_for_link){
+                        u_int64_t new_data_block_idx = get_empty_data_block();
+                        data_blocks[last_data_block_idx].offset = new_data_block_idx;
+                        *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
+                        data_maps[last_data_block_idx] = true;
+                    }
+                }
+                current_direcotry_inode = &inodes[new_inode_idx];
+            }
+        }
+    }
+
+    void show_files_tree(INode* directory_inode, unsigned prefix){
+        for (u_int64_t i = 0; i < inodes_length; i++){
+            if(inodes[i].data_block_index == -1)
+                break;
+            DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[i].data;
+            for(u_int64_t j = 0; j < DIRECTORY_LINKS_IN_DATA_BLOCK; j++){
+                if(!direcotry_links[j].used)
+                    continue;
+                std::cout << j << direcotry_links[j].name << ", ";
+            }
         }
     }
 
@@ -178,20 +231,36 @@ private:
         for(u_int32_t i = 0; i < inodes_length; i++)
             if (inodes[i].type == INodeType::UNUSED_NODE)
                 return i;
-        return 0;
+        return -1;
     }
 
     u_int32_t get_empty_data_block(){
         for(u_int32_t i = 0; i < datablocks_length; i++)
             if (data_maps[i] == false)
                 return i;
-        return 0;
+        return -1;
     }
 
-    DirectoryLink *get_directory_link(INode *direcotry, char *name){
-        for(int i = 0; i < inodes_length; i++){
+    INode* get_inode_in_inode(INode *direcotry, char *name){
+        DirectoryLink *directory_link = get_direcotry_in_inode(direcotry, name);
+        if(!directory_link)
+            return NULL;
+        return &inodes[directory_link->inode_id];
+    }
 
+    DirectoryLink *get_direcotry_in_inode(INode *direcotry, char *name){
+        if(direcotry->type != INodeType::DIRECTORY_NODE)
+            return NULL;
+        u_int64_t current_data_block_idx = direcotry->data_block_index;
+        while(current_data_block_idx != -1){
+            DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
+            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+                if(direcotry_links[idx].used && strcmp((char*)direcotry_links[idx].name, name) == 0)
+                    return &direcotry_links[idx];
+            }
+            current_data_block_idx = data_blocks[current_data_block_idx].offset;
         }
+        return NULL;
     }
 
     void load_lengths(SuperBlock super_block_){
@@ -207,8 +276,18 @@ int main(int argc, char* argv[]) {
     virtual_disc.create((char*)"test", 1024*1024);
     virtual_disc.open();
     char direcotries[80];
-    strcpy(direcotries, "dupa/jasia/karuzela");
+    strcpy(direcotries, "a/b/c");
     virtual_disc.create_directory(direcotries);
+    strcpy(direcotries, "a/b/d");
+    virtual_disc.create_directory(direcotries);
+    strcpy(direcotries, "a/b/e");
+    virtual_disc.create_directory(direcotries);
+    // for(int i = 0; i < 64; i++){
+    //     virtual_disc.create_directory("aaa");
+    //     virtual_disc.create_directory("bbb");
+    //     virtual_disc.create_directory("ccc");
+    // }
+    // virtual_disc.show_files_tree(&virtual_disc.inodes[0], 0);
     // std::cout << virtual_disc.super_block.disc_size;
     // virtual_disc.create_directory((char *)"dupa");
     virtual_disc.close();
