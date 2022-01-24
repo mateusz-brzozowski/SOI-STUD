@@ -64,7 +64,7 @@ public:
     SuperBlock super_block;
     u_int64_t inodes_length;
     u_int64_t data_maps_length;
-    u_int64_t datablocks_length;
+    u_int64_t data_blocks_length;
 
 
 public:
@@ -110,7 +110,7 @@ public:
             fwrite(&idx, sizeof(bool), 1, file);
         }
 
-        for(int i = 0; i < datablocks_length; i++){
+        for(int i = 0; i < data_blocks_length; i++){
             DataBlock data_block{};
             data_block.offset = -1;
             fwrite(&data_block, sizeof(DataBlock), 1, file);
@@ -127,8 +127,8 @@ public:
         fread(inodes, sizeof(INode), inodes_length, file);
         data_maps = new bool[data_maps_length];
         fread(data_maps, sizeof(bool), data_maps_length, file);
-        data_blocks = new DataBlock[datablocks_length];
-        fread(data_blocks, sizeof(DataBlock), datablocks_length, file);
+        data_blocks = new DataBlock[data_blocks_length];
+        fread(data_blocks, sizeof(DataBlock), data_blocks_length, file);
     }
 
     void close(){
@@ -136,7 +136,7 @@ public:
         fwrite(&super_block, sizeof(SuperBlock), 1 ,file);
         fwrite(inodes, sizeof(INode), inodes_length, file);
         fwrite(data_maps, sizeof(bool), data_maps_length, file);
-        fwrite(data_blocks, sizeof(DataBlock), datablocks_length, file);
+        fwrite(data_blocks, sizeof(DataBlock), data_blocks_length, file);
         fclose(file);
     }
 
@@ -210,7 +210,7 @@ public:
     }
 
     void file_to_disc(char *path, char *file_name){
-        INode* direcotry_inode = get_direcotry_inode(path);
+        INode *direcotry_inode = get_direcotry_inode(path);
         if(!direcotry_inode){
             std::cerr << "Invalid path";
             exit(EXIT_FAILURE);
@@ -267,6 +267,36 @@ public:
         }
     }
 
+    void file_from_disc(char *path, char *file_name, char *file_name_destination){
+        INode *direcotry_inode = get_direcotry_inode(path);
+        if(!direcotry_inode){
+            std::cerr << "Invalid path";
+            exit(EXIT_FAILURE);
+        }
+        INode *file= get_inode_in_inode(direcotry_inode, file_name);
+        if(!file){
+            std::cerr << "Missing file";
+            exit(EXIT_FAILURE);
+        }
+        FILE *file_destination = fopen(file_name_destination, "wb+");
+        u_int64_t current_data_block_idx = file->data_block_index;
+        u_int64_t left_size = file->size;
+        while(current_data_block_idx != -1){
+            u_int8_t *data = data_blocks[current_data_block_idx].data;
+            fwrite(data, (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE), 1, file_destination);
+            left_size -= (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE);
+            current_data_block_idx = data_blocks[current_data_block_idx].offset;
+        }
+    }
+
+    u_int64_t get_left_space(){
+        u_int64_t left_space = 0;
+        for(int i = 0; i < data_blocks_length; i++)
+            if(data_maps[i] == 0)
+                left_space += DATA_BLOCK_SIZE;
+        return left_space;
+    }
+
 private:
     bool is_valid_name(char *name){
         if(strlen(name) >= NAME_LENGTH or !strcmp(name, ".") or !strcmp(name, "..") or strpbrk(name, "/") or name[0] == 0)
@@ -282,7 +312,7 @@ private:
     }
 
     u_int32_t get_empty_data_block(){
-        for(u_int32_t i = 0; i < datablocks_length; i++)
+        for(u_int32_t i = 0; i < data_blocks_length; i++)
             if (data_maps[i] == false)
                 return i;
         return -1;
@@ -313,7 +343,7 @@ private:
     void load_lengths(SuperBlock super_block_){
         inodes_length = super_block_.inodes_count;
         data_maps_length = super_block_.unused_datablocks;
-        datablocks_length = super_block_.unused_datablocks;
+        data_blocks_length = super_block_.unused_datablocks;
     }
 
     void add_link_to_inode(INode* inode, DirectoryLink directory_link){
@@ -386,6 +416,7 @@ int main(int argc, char* argv[]) {
     virtual_disc.create_directory("c");
     char direcotries[80];
     char file[80];
+    char file_destinaiton[80];
     strcpy(direcotries, "a/x");
     virtual_disc.create_directory(direcotries);
     strcpy(direcotries, "a/y");
@@ -407,7 +438,13 @@ int main(int argc, char* argv[]) {
     strcpy(file, "matejko");
     virtual_disc.file_to_disc(direcotries, file);
 
+    strcpy(direcotries, "a/x");
+    strcpy(file, "matejko");
+    strcpy(file_destinaiton, "matejko_out");
+    virtual_disc.file_from_disc(direcotries, file, file_destinaiton);
     virtual_disc.show_files_tree(&virtual_disc.inodes[0], 0);
+
+    std::cout << virtual_disc.get_left_space();
 
     // for(int i = 0; i < 64; i++){
     //     sprintf(direcotries, "%d", i);
