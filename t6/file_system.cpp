@@ -67,6 +67,8 @@ public:
     u_int64_t inodes_length;
     u_int64_t data_maps_length;
     u_int64_t data_blocks_length;
+    std::vector<DirectoryLink*> shown_direcotry_links;
+    std::vector<INode*> shown_inodes;
 
 
 public:
@@ -186,6 +188,7 @@ public:
     }
 
     void show_files_tree(char *path){
+        shown_direcotry_links.clear();
         INode *directory = get_direcotry_inode(path);
         return show_files_inode(directory, 0);
     }
@@ -294,6 +297,7 @@ public:
     }
 
     u_int64_t get_full_size(char *path){
+        shown_inodes.clear();
         INode *directory = get_direcotry_inode(path);
         return get_size_inode(directory);
     }
@@ -323,6 +327,52 @@ public:
         strncpy((char *)new_file_link.name, link_file_name, NAME_LENGTH);
 
         add_link_to_inode(link_directory_inode, new_file_link);
+    }
+
+    void show_information(char *path){
+        // std:: cout <<
+    }
+
+    void remove_link(char *path, char* file_name){
+        INode *direcotry_inode = get_direcotry_inode(path);
+        if(!direcotry_inode){
+            std::cerr << "Invalid path";
+            exit(EXIT_FAILURE);
+        }
+        INode *file= get_inode_in_inode(direcotry_inode, file_name);
+        if(!file){
+            std::cerr << "Missing file";
+            exit(EXIT_FAILURE);
+        }
+        remove_inode(file);
+        DirectoryLink *direcotry_link = get_direcotry_in_inode(direcotry_inode, file_name);
+        direcotry_link->inode_id = -1;
+        direcotry_link->used = false;
+    }
+
+    void cut_file(char *path, char* file_name, size_t size_to_cut){
+        INode *direcotry_inode = get_direcotry_inode(path);
+        if(!direcotry_inode){
+            std::cerr << "Invalid path";
+            exit(EXIT_FAILURE);
+        }
+        INode *file= get_inode_in_inode(direcotry_inode, file_name);
+        if(!file){
+            std::cerr << "Missing file";
+            exit(EXIT_FAILURE);
+        }
+
+        file->size -= size_to_cut;
+        u_int64_t start_cut_block = file->size / DATA_BLOCK_SIZE;
+        if(file->size % DATA_BLOCK_SIZE != 0)
+            start_cut_block++;
+        while(data_blocks[start_cut_block].offset != -1){
+            // TODO: ZROBIĆ TO< BO NIE DZIAŁĄ WGL.
+            if(file->data_block_index == -1)
+                break;
+            data_blocks[start_cut_block].offset;
+            start_cut_block++;
+        }
     }
 
 private:
@@ -445,6 +495,9 @@ private:
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
             for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(direcotry_links[idx].used){
+                    if(std::find(shown_inodes.begin(),shown_inodes.end(), &inodes[direcotry_links[idx].inode_id]) != shown_inodes.end())
+                        continue;
+                    shown_inodes.push_back(&inodes[direcotry_links[idx].inode_id]);
                     if(inodes[direcotry_links[idx].inode_id].type == INodeType::FILE_NODE)
                         size += inodes[direcotry_links[idx].inode_id].size;
                     else
@@ -459,7 +512,6 @@ private:
     void show_files_inode(INode* directory_inode, int rec_lvl){
         if(directory_inode->type != INodeType::DIRECTORY_NODE)
             return;
-        std::vector<DirectoryLink> shown_direcotry_links;
         u_int64_t current_data_block_idx = directory_inode->data_block_index;
         while(current_data_block_idx != -1){
             std::cout << "\n";
@@ -469,6 +521,9 @@ private:
             for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(!direcotry_links[idx].used)
                     continue;
+                if(std::find(shown_direcotry_links.begin(),shown_direcotry_links.end(), &direcotry_links[idx]) != shown_direcotry_links.end())
+                    continue;
+                shown_direcotry_links.push_back(&direcotry_links[idx]);
                 if (inodes[direcotry_links[idx].inode_id].type == INodeType::DIRECTORY_NODE)
                     std:: cout << "\x1B[34m" << direcotry_links[idx].name << "\033[0m ";
                 else
@@ -480,6 +535,32 @@ private:
                 std::cout << "  ";
             current_data_block_idx = data_blocks[current_data_block_idx].offset;
         }
+    }
+
+    void remove_inode(INode* inode){
+        inode->reference_count -= 1;
+        if(inode->reference_count != 0)
+            return;
+        if(inode->type == INodeType::DIRECTORY_NODE){
+            u_int64_t current_data_block_idx = inode->data_block_index;
+            while(current_data_block_idx != -1){
+                DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
+                for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+                    if(direcotry_links[idx].used){
+                        remove_inode(&inodes[direcotry_links[idx].inode_id]);
+                    }
+                }
+                current_data_block_idx = data_blocks[current_data_block_idx].offset;
+            }
+        }
+        inode->data_block_index = -1;
+        inode->type = INodeType::UNUSED_NODE;
+        inode->type = 0;
+        inode->reference_count = 0;
+    }
+
+    INode *get_inode_in_dictionary(){
+
     }
 };
 
@@ -534,11 +615,11 @@ int main(int argc, char* argv[]) {
     strcpy(direcotries, "a");
     std::cout << virtual_disc.get_full_size(direcotries) << "\n";
 
-    // strcpy(direcotries, "a/x");
-    // strcpy(file, "matejko");
-    // strcpy(file_destinaiton, "a/y");
-    // strcpy(link_name, "matejkolink");
-    // virtual_disc.create_link(direcotries, file, file_destinaiton, link_name);
+    strcpy(direcotries, "a/x");
+    strcpy(file, "matejko");
+    strcpy(file_destinaiton, "a/y");
+    strcpy(link_name, "matejkolink");
+    virtual_disc.create_link(direcotries, file, file_destinaiton, link_name);
 
     strcpy(direcotries, "");
     strcpy(file, "a");
@@ -546,11 +627,19 @@ int main(int argc, char* argv[]) {
     strcpy(link_name, "alink");
     virtual_disc.create_link(direcotries, file, file_destinaiton, link_name);
 
-    // strcpy(direcotries, "a");
-    // std::cout << virtual_disc.get_full_size(direcotries) << "\n";
+    strcpy(direcotries, "a/x");
+    strcpy(file, "matejko");
+    virtual_disc.remove_link(direcotries, file);
 
-    // strcpy(direcotries, "");
-    // virtual_disc.show_files_tree(direcotries);
+    strcpy(direcotries, "");
+    strcpy(file, "a");
+    virtual_disc.remove_link(direcotries, file);
+
+    strcpy(direcotries, "");
+    std::cout << virtual_disc.get_full_size(direcotries) << "\n";
+
+    strcpy(direcotries, "");
+    virtual_disc.show_files_tree(direcotries);
 
     virtual_disc.close();
     return 0;
