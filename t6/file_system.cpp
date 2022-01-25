@@ -366,13 +366,30 @@ public:
         u_int64_t start_cut_block = file->size / DATA_BLOCK_SIZE;
         if(file->size % DATA_BLOCK_SIZE != 0)
             start_cut_block++;
-        while(data_blocks[start_cut_block].offset != -1){
-            // TODO: ZROBIĆ TO< BO NIE DZIAŁĄ WGL.
-            if(file->data_block_index == -1)
-                break;
-            data_blocks[start_cut_block].offset;
-            start_cut_block++;
+        u_int64_t data_block_idx = file->data_block_index;
+        for(u_int64_t idx = 0; idx < start_cut_block; idx++)
+            data_block_idx = data_blocks[idx].offset;
+        clear_datablocks(data_block_idx);
+    }
+
+    void extend_file(char *path, char* file_name, size_t size_to_extend){
+        INode *direcotry_inode = get_direcotry_inode(path);
+        if(!direcotry_inode){
+            std::cerr << "Invalid path";
+            exit(EXIT_FAILURE);
         }
+        INode *file= get_inode_in_inode(direcotry_inode, file_name);
+        if(!file){
+            std::cerr << "Missing file";
+            exit(EXIT_FAILURE);
+        }
+
+        u_int64_t last_datablock_idx = file->data_block_index;
+        while(data_blocks[last_datablock_idx].offset != -1)
+            last_datablock_idx = data_blocks[last_datablock_idx].offset;
+
+        u_int64_t last_datablock_size = file->size % DATA_BLOCK_SIZE;
+        // TODO: DUZO ROBOTY TU JESZCZE
     }
 
 private:
@@ -553,10 +570,31 @@ private:
                 current_data_block_idx = data_blocks[current_data_block_idx].offset;
             }
         }
+        clear_datablocks(inode->data_block_index);
         inode->data_block_index = -1;
         inode->type = INodeType::UNUSED_NODE;
         inode->type = 0;
         inode->reference_count = 0;
+    }
+
+    void clear_datablocks(u_int64_t data_block_idx){
+        std::vector<u_int64_t> data_blocks_idxs;
+        if(data_block_idx == -1)
+            return;
+        u_int64_t next_data_block_idx = data_blocks[data_block_idx].offset;
+        if(next_data_block_idx != -1)
+            data_blocks_idxs.push_back(next_data_block_idx);
+        data_blocks[data_block_idx].offset = -1;
+        while (next_data_block_idx != -1)
+        {
+            next_data_block_idx = data_blocks[next_data_block_idx].offset;
+            if(next_data_block_idx != -1){
+                data_blocks[next_data_block_idx].offset = -1;
+                data_blocks_idxs.push_back(next_data_block_idx);
+            }
+        }
+        for(auto idx:data_blocks_idxs)
+            data_maps[idx] = false;
     }
 
     INode *get_inode_in_dictionary(){
