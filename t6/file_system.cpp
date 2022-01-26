@@ -138,6 +138,10 @@ public:
 
     void open(){
         std::ifstream file(name, std::ios::out | std::ios::binary);
+        if(!file){
+            std::cout << "Cannot open file";
+            exit(EXIT_FAILURE);
+        }
         file.read((char*)&super_block, sizeof(SuperBlock));
         load_lengths(super_block);
         inodes = new INode[inodes_length];
@@ -196,7 +200,6 @@ public:
                 return;
             } else{
                 u_int64_t new_inode_idx = get_empty_inode();
-                // TODO: CHECK IF EXISTS
                 inodes[new_inode_idx].reference_count = 1;
                 inodes[new_inode_idx].type = INodeType::DIRECTORY_NODE;
 
@@ -207,7 +210,6 @@ public:
 
                 if(current_direcotry_inode->data_block_index == -1){
                     u_int64_t new_data_block_idx = get_empty_data_block();
-                    // TOOD: CHECK IF EXISTS
                     current_direcotry_inode->data_block_index = new_data_block_idx;
                     *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
                     data_maps[new_data_block_idx] = true;
@@ -239,7 +241,6 @@ public:
         }
 
         u_int64_t new_inode_idx = get_empty_inode();
-        // TODO: CHECK IF EXISTS
         inodes[new_inode_idx].reference_count = 1;
         inodes[new_inode_idx].type = INodeType::FILE_NODE;
         inodes[new_inode_idx].size = 0;
@@ -377,8 +378,10 @@ public:
         add_link_to_inode(link_directory_inode, new_file_link);
     }
 
-    void show_information(char *path){
-        // std:: cout <<
+    void show_information(std::string pwd){
+        std::cout << "Files size: " << get_size(pwd) << std::endl;
+        std::cout << "Full size: " << get_full_size(pwd) << std::endl;
+        std::cout << "Left space: " << get_left_space() << std::endl;
     }
 
     void remove_link(std::string pwd){
@@ -496,6 +499,8 @@ private:
         for(u_int32_t i = 0; i < inodes_length; i++)
             if (inodes[i].type == INodeType::UNUSED_NODE)
                 return i;
+        std::cerr << "Lack of empty inodes\n";
+        exit(EXIT_FAILURE);
         return -1;
     }
 
@@ -503,6 +508,8 @@ private:
         for(u_int32_t i = 0; i < data_blocks_length; i++)
             if (data_maps[i] == false)
                 return i;
+        std::cerr << "Lack of empty data blokcs\n";
+        exit(EXIT_FAILURE);
         return -1;
     }
 
@@ -523,8 +530,6 @@ private:
                 DirectoryLink directory_link = direcotry_links[idx];
                 if((directory_link.used) && strcmp((char*)directory_link.name, name.c_str()) == 0)
                     return &direcotry_links[idx];
-                // if(direcotry_links[idx].used && strcmp((char*)direcotry_links[idx].name, name) == 0)
-                //     return &direcotry_links[idx];
             }
             current_data_block_idx = data_blocks[current_data_block_idx].offset;
         }
@@ -765,6 +770,7 @@ int main(int argc, char* argv[]) {
     std::cout << virtual_disc.get_size("a/x") << "\n";
     virtual_disc.extend_file("a/x/matejko", 53);
     std::cout << virtual_disc.get_size("a/x") << "\n";
+    virtual_disc.show_information("a/x");
     virtual_disc.close();
 
     // std::unordered_map<std::string, std::function<void(int, char**)>> functions {
