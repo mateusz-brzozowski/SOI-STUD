@@ -63,7 +63,6 @@ struct SuperBlock{
 
 class VirtualDisc{
 public:
-    // char name[NAME_LENGTH];
     std::string name;
     FILE* file;
     INode *inodes;
@@ -139,19 +138,17 @@ public:
 
     void open(){
         std::ifstream file(name, std::ios::out | std::ios::binary);
-        // file = fopen(name, "rb+");
         file.read((char*)&super_block, sizeof(SuperBlock));
-        // fread(&super_block, sizeof(SuperBlock), 1 ,file);
         load_lengths(super_block);
         inodes = new INode[inodes_length];
-        file.read((char*)inodes, inodes_length);
-        // fread(inodes, sizeof(INode), inodes_length, file);
+        for(int i = 0; i < inodes_length; i++)
+            file.read((char*)&inodes[i], sizeof(INode));
         data_maps = new bool[data_maps_length];
-        file.read((char*)data_maps, data_maps_length);
-        // fread(data_maps, sizeof(bool), data_maps_length, file);
+        for(int i = 0; i < data_maps_length - 1; i++)
+            file.read((char*)&data_maps[i], sizeof(bool));
         data_blocks = new DataBlock[data_blocks_length];
-        file.read((char*)data_blocks, data_blocks_length);
-        // fread(data_blocks, sizeof(DataBlock), data_blocks_length, file);
+        for(int i = 0; i < data_blocks_length - 1; i++)
+            file.read((char*)&data_blocks[i], sizeof(DataBlock));
         file.close();
         if(!file.good()){
             std::cout << "Reagin from file error";
@@ -165,16 +162,13 @@ public:
             std::cout << "Cannot open file";
             exit(EXIT_FAILURE);
         }
-        // fseek(file, 0, 0);
         file.write((char*)&super_block, sizeof(SuperBlock));
-        file.write((char*)inodes, sizeof(INode));
-        file.write((char*)data_maps, sizeof(bool));
-        file.write((char*)data_blocks, sizeof(DataBlock));
-
-        // fwrite(&super_block, sizeof(SuperBlock), 1 ,file);
-        // fwrite(inodes, sizeof(INode), inodes_length, file);
-        // fwrite(data_maps, sizeof(bool), data_maps_length, file);
-        // fwrite(data_blocks, sizeof(DataBlock), data_blocks_length, file);
+        for(int i = 0; i < inodes_length; i++)
+            file.write((char*)&inodes[i], sizeof(INode));
+        for(int i = 0; i < data_maps_length; i++)
+            file.write((char*)&data_maps[i], sizeof(bool));
+        for(int i = 0; i < data_blocks_length; i++)
+            file.write((char*)&data_blocks[i], sizeof(DataBlock));
         file.close();
         if(!file.good()){
             std::cout << "Writing to file error";
@@ -186,10 +180,10 @@ public:
         // strncpy(name, file_name, NAME_LENGTH);
     }
 
-    void create_directory(char *path){
+    void create_directory(std::string pwd){
+        std::vector<std::string> directories = split_pwd(pwd);
         INode *current_direcotry_inode = inodes;
-        char *current_directory_name = strtok(path, "/");
-        for(current_directory_name; current_directory_name != NULL; current_directory_name = strtok(NULL, "/")){
+        for(auto current_directory_name : directories){
             if(!is_valid_name(current_directory_name)){
                 std::cerr << "Invalid directory name: " << current_directory_name << "\n";
                 exit(EXIT_FAILURE);
@@ -209,7 +203,7 @@ public:
                 DirectoryLink new_directory_link{0};
                 new_directory_link.used = true;
                 new_directory_link.inode_id = new_inode_idx;
-                strncpy((char *)new_directory_link.name, current_directory_name, NAME_LENGTH);
+                strncpy((char *)new_directory_link.name, current_directory_name.c_str(), NAME_LENGTH);
 
                 if(current_direcotry_inode->data_block_index == -1){
                     u_int64_t new_data_block_idx = get_empty_data_block();
@@ -467,8 +461,8 @@ public:
     }
 
 private:
-    bool is_valid_name(char *name){
-        if(strlen(name) >= NAME_LENGTH or !strcmp(name, ".") or !strcmp(name, "..") or strpbrk(name, "/") or name[0] == 0)
+    bool is_valid_name(std::string name){
+        if(name.length() >= NAME_LENGTH or name == "." or name == ".." or name == "/")
             return false;
         return true;
     }
@@ -487,14 +481,14 @@ private:
         return -1;
     }
 
-    INode* get_inode_in_inode(INode *direcotry, char *name){
+    INode* get_inode_in_inode(INode *direcotry, std::string name){
         DirectoryLink *directory_link = get_direcotry_in_inode(direcotry, name);
         if(!directory_link)
             return NULL;
         return &inodes[directory_link->inode_id];
     }
 
-    DirectoryLink *get_direcotry_in_inode(INode *direcotry, char *name){
+    DirectoryLink *get_direcotry_in_inode(INode *direcotry, std::string name){
         if(direcotry->type != INodeType::DIRECTORY_NODE)
             return NULL;
         u_int64_t current_data_block_idx = direcotry->data_block_index;
@@ -502,7 +496,7 @@ private:
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
             for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 DirectoryLink directory_link = direcotry_links[idx];
-                if((directory_link.used) && strcmp((char*)directory_link.name, name) == 0)
+                if((directory_link.used) && strcmp((char*)directory_link.name, name.c_str()) == 0)
                     return &direcotry_links[idx];
                 // if(direcotry_links[idx].used && strcmp((char*)direcotry_links[idx].name, name) == 0)
                 //     return &direcotry_links[idx];
@@ -720,8 +714,11 @@ void create(int argc, char* argv[]){
 int main(int argc, char* argv[]) {
     VirtualDisc virtual_disc;
     virtual_disc.create("test", 1024*1024);
-    // virtual_disc.open();
-    // virtual_disc.close();
+    virtual_disc.open();
+    virtual_disc.close();
+    virtual_disc.open();
+    virtual_disc.create_directory("a/b/c");
+    virtual_disc.close();
     // char direcotries[80];
     // char file[80];
     // char file_destinaiton[80];
