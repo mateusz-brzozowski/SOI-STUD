@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <fstream>
 
 
 #define DATA_BLOCK_SIZE 8192
@@ -62,7 +63,8 @@ struct SuperBlock{
 
 class VirtualDisc{
 public:
-    char name[NAME_LENGTH];
+    // char name[NAME_LENGTH];
+    std::string name;
     FILE* file;
     INode *inodes;
     bool *data_maps;
@@ -76,9 +78,13 @@ public:
 
 
 public:
-    void create(char *file_name, u_int64_t disc_size){
-        strncpy(name, file_name, NAME_LENGTH);
-        file = fopen(name, "wb+");
+    void create(std::string file_name, u_int64_t disc_size){
+        name = file_name;
+        std::ofstream file(file_name, std::ios::out | std::ios::binary);
+        if(!file){
+            std::cout << "Cannot open file";
+            exit(EXIT_FAILURE);
+        }
 
         u_int64_t number_of_inodes = disc_size / sizeof(INode) / FILES_SPACE;
         u_int64_t max_number_of_data_blocks = (disc_size - sizeof(SuperBlock) - number_of_inodes * sizeof(INode)) / sizeof(DataBlock);
@@ -86,7 +92,7 @@ public:
         u_int64_t data_map_offset = sizeof(SuperBlock) + number_of_inodes * sizeof(INode);
         u_int64_t data_block_offset = data_map_offset + number_of_data_blocks * sizeof(bool);
 
-        strncpy((char*)super_block.name, name, NAME_LENGTH);
+        strncpy((char*)super_block.name, name.c_str(), NAME_LENGTH);
         super_block.disc_size = disc_size;
         super_block.inodes_count = number_of_inodes;
         super_block.unused_inodes = number_of_inodes;
@@ -104,52 +110,80 @@ public:
         root.reference_count = 1;
         super_block.unused_inodes -= 1;
 
-        fwrite(&super_block, sizeof(SuperBlock), 1, file);
-        fwrite(&root, sizeof(INode), 1, file);
+        file.write((char*)&super_block, sizeof(SuperBlock));
+        file.write((char*)&root, sizeof(INode));
 
         for(int i = 0; i < inodes_length - 1; i++){
             INode inode{};
             inode.data_block_index = -1;
-            fwrite(&inode, sizeof(INode), 1, file);
+            file.write((char*)&inode, sizeof(INode));
         }
 
         for(int i = 0; i < data_maps_length; i++){
             unsigned int idx;
-            fwrite(&idx, sizeof(bool), 1, file);
+            file.write((char*)&idx, sizeof(bool));
         }
 
         for(int i = 0; i < data_blocks_length; i++){
             DataBlock data_block{};
             data_block.offset = -1;
-            fwrite(&data_block, sizeof(DataBlock), 1, file);
+            file.write((char*)&data_block, sizeof(DataBlock));
         }
 
-        fclose(file);
+        file.close();
+        if(!file.good()){
+            std::cout << "Writing to file error";
+            exit(EXIT_FAILURE);
+        }
     }
 
     void open(){
-        file = fopen(name, "rb+");
-        fread(&super_block, sizeof(SuperBlock), 1 ,file);
+        std::ifstream file(name, std::ios::out | std::ios::binary);
+        // file = fopen(name, "rb+");
+        file.read((char*)&super_block, sizeof(SuperBlock));
+        // fread(&super_block, sizeof(SuperBlock), 1 ,file);
         load_lengths(super_block);
         inodes = new INode[inodes_length];
-        fread(inodes, sizeof(INode), inodes_length, file);
+        file.read((char*)inodes, inodes_length);
+        // fread(inodes, sizeof(INode), inodes_length, file);
         data_maps = new bool[data_maps_length];
-        fread(data_maps, sizeof(bool), data_maps_length, file);
+        file.read((char*)data_maps, data_maps_length);
+        // fread(data_maps, sizeof(bool), data_maps_length, file);
         data_blocks = new DataBlock[data_blocks_length];
-        fread(data_blocks, sizeof(DataBlock), data_blocks_length, file);
+        file.read((char*)data_blocks, data_blocks_length);
+        // fread(data_blocks, sizeof(DataBlock), data_blocks_length, file);
+        file.close();
+        if(!file.good()){
+            std::cout << "Reagin from file error";
+            exit(EXIT_FAILURE);
+        }
     }
 
     void close(){
-        fseek(file, 0, 0);
-        fwrite(&super_block, sizeof(SuperBlock), 1 ,file);
-        fwrite(inodes, sizeof(INode), inodes_length, file);
-        fwrite(data_maps, sizeof(bool), data_maps_length, file);
-        fwrite(data_blocks, sizeof(DataBlock), data_blocks_length, file);
-        fclose(file);
+        std::ofstream file(name, std::ios::out | std::ios::binary);
+        if(!file){
+            std::cout << "Cannot open file";
+            exit(EXIT_FAILURE);
+        }
+        // fseek(file, 0, 0);
+        file.write((char*)&super_block, sizeof(SuperBlock));
+        file.write((char*)inodes, sizeof(INode));
+        file.write((char*)data_maps, sizeof(bool));
+        file.write((char*)data_blocks, sizeof(DataBlock));
+
+        // fwrite(&super_block, sizeof(SuperBlock), 1 ,file);
+        // fwrite(inodes, sizeof(INode), inodes_length, file);
+        // fwrite(data_maps, sizeof(bool), data_maps_length, file);
+        // fwrite(data_blocks, sizeof(DataBlock), data_blocks_length, file);
+        file.close();
+        if(!file.good()){
+            std::cout << "Writing to file error";
+            exit(EXIT_FAILURE);
+        }
     }
 
     void set_name(char *file_name){
-        strncpy(name, file_name, NAME_LENGTH);
+        // strncpy(name, file_name, NAME_LENGTH);
     }
 
     void create_directory(char *path){
@@ -684,8 +718,8 @@ void create(int argc, char* argv[]){
 
 
 int main(int argc, char* argv[]) {
-    // VirtualDisc virtual_disc;
-    // virtual_disc.create((char*)"test", 1024*1024);
+    VirtualDisc virtual_disc;
+    virtual_disc.create("test", 1024*1024);
     // virtual_disc.open();
     // virtual_disc.close();
     // char direcotries[80];
