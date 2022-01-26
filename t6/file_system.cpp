@@ -1,9 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <string.h>
+#include <string>
+#include <unordered_map>
+#include <functional>
+
 
 #define DATA_BLOCK_SIZE 8192
 #define NAME_LENGTH 16
@@ -362,14 +366,26 @@ public:
             exit(EXIT_FAILURE);
         }
 
+        if(file->size < size_to_cut){
+            std::cerr << "Size to cut greater than file's size";
+            exit(EXIT_FAILURE);
+        }
+
         file->size -= size_to_cut;
         u_int64_t start_cut_block = file->size / DATA_BLOCK_SIZE;
         if(file->size % DATA_BLOCK_SIZE != 0)
             start_cut_block++;
         u_int64_t data_block_idx = file->data_block_index;
-        for(u_int64_t idx = 0; idx < start_cut_block; idx++)
+        u_int64_t prev_data_block_idx = -1;
+        for(u_int64_t idx = 0; idx < start_cut_block; idx++){
+            prev_data_block_idx = data_block_idx;
             data_block_idx = data_blocks[idx].offset;
+        }
         clear_datablocks(data_block_idx);
+        if(prev_data_block_idx == -1)
+            file->data_block_index = -1;
+        else
+            data_blocks[prev_data_block_idx].offset = -1;
     }
 
     void extend_file(char *path, char* file_name, size_t size_to_extend){
@@ -603,123 +619,78 @@ private:
 
     void clear_datablocks(u_int64_t data_block_idx){
         std::vector<u_int64_t> data_blocks_idxs;
-        if(data_block_idx == -1)
-            return;
-        u_int64_t next_data_block_idx = data_blocks[data_block_idx].offset;
-        if(next_data_block_idx != -1)
-            data_blocks_idxs.push_back(next_data_block_idx);
-        data_blocks[data_block_idx].offset = -1;
-        while (next_data_block_idx != -1)
-        {
-            next_data_block_idx = data_blocks[next_data_block_idx].offset;
-            if(next_data_block_idx != -1){
-                data_blocks[next_data_block_idx].offset = -1;
-                data_blocks_idxs.push_back(next_data_block_idx);
-            }
+        u_int64_t idx = data_block_idx;
+        while(idx != -1){
+            data_blocks_idxs.push_back(idx);
+            idx = data_blocks[idx].offset;
         }
-        for(auto idx:data_blocks_idxs)
+        for(auto idx:data_blocks_idxs){
+            data_blocks[idx].offset = -1;
             data_maps[idx] = false;
+        }
     }
 
-    INode *get_inode_in_dictionary(){
-
-    }
 };
+
+#pragma region user_interface
+
+void help(int argc, char* argv[]){
+
+}
+void mkdir(int argc, char* argv[]){
+
+}
+void tree(int argc, char* argv[]){
+
+}
+void remove_file(int argc, char* argv[]){
+
+}
+void get_file(int argc, char* argv[]){
+
+}
+void link(int argc, char* argv[]){
+
+}
+void unlink(int argc, char* argv[]){
+
+}
+void send_file(int argc, char* argv[]){
+
+}
+void get_file(int argc, char* argv[]){
+
+}
+void information(int argc, char* argv[]){
+
+}
+void cut_file(int argc, char* argv[]){
+
+}
+void extend_file(int argc, char* argv[]){
+
+}
+void create(int argc, char* argv[]){
+
+}
+#pragma endregion
+
 
 int main(int argc, char* argv[]) {
     VirtualDisc virtual_disc;
-    virtual_disc.set_name((char*)"test");
     virtual_disc.create((char*)"test", 1024*1024);
     virtual_disc.open();
     virtual_disc.close();
-    virtual_disc.open();
-    virtual_disc.create_directory("a");
-    virtual_disc.create_directory("b");
-    virtual_disc.create_directory("c");
-    char direcotries[80];
-    char file[80];
-    char file_destinaiton[80];
-    char link_name[80];
-    strcpy(direcotries, "a/x");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/y");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/z");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/x/k");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/x/l");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/x/m");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/z/q");
-    virtual_disc.create_directory(direcotries);
-    strcpy(direcotries, "a/z/w");
-    virtual_disc.create_directory(direcotries);
-
-    strcpy(direcotries, "a/x");
-    strcpy(file, "matejko");
-    virtual_disc.file_to_disc(direcotries, file);
-
-    strcpy(direcotries, "a/x");
-    strcpy(file, "matejko");
-    strcpy(file_destinaiton, "matejko_out");
-    virtual_disc.file_from_disc(direcotries, file, file_destinaiton);
-
-    strcpy(direcotries, "");
-    virtual_disc.show_files_tree(direcotries);
-
-    std::cout << virtual_disc.get_left_space() << "\n";
-
-    strcpy(direcotries, "a");
-    std::cout << virtual_disc.get_size(direcotries) << "\n";
-
-    strcpy(direcotries, "a");
-    std::cout << virtual_disc.get_full_size(direcotries) << "\n";
-
-    strcpy(direcotries, "a/x");
-    strcpy(file, "matejko");
-    strcpy(file_destinaiton, "a/y");
-    strcpy(link_name, "matejkolink");
-    virtual_disc.create_link(direcotries, file, file_destinaiton, link_name);
-
-    strcpy(direcotries, "");
-    strcpy(file, "a");
-    strcpy(file_destinaiton, "a/z");
-    strcpy(link_name, "alink");
-    virtual_disc.create_link(direcotries, file, file_destinaiton, link_name);
-
-    strcpy(direcotries, "a/x");
-     std::cout << virtual_disc.get_size(direcotries) << "\n";
-
-    strcpy(direcotries, "a/x");
-    strcpy(file, "matejko");
-    virtual_disc.cut_file(direcotries, file, 2 );
-
-    strcpy(direcotries, "a/x");
-    std::cout << virtual_disc.get_size(direcotries) << "\n";
-
-
-    strcpy(direcotries, "a/x");
-    strcpy(file, "matejko");
-    virtual_disc.extend_file(direcotries, file, 58 );
-
-    strcpy(direcotries, "a/x");
-    std::cout << virtual_disc.get_size(direcotries) << "\n";
-
-
-
-    // strcpy(direcotries, "a/x");
-    // strcpy(file, "matejko");
-    // virtual_disc.remove_link(direcotries, file);
-
-    strcpy(direcotries, "");
-    strcpy(file, "a");
-    virtual_disc.remove_link(direcotries, file);
-
-    strcpy(direcotries, "");
-    virtual_disc.show_files_tree(direcotries);
-
-    virtual_disc.close();
+    // std::unordered_map<std::string, std::function<void(int, char**)>> functions {
+    //     {"help", help}, {"mkdir", mkdir}, {"tree", tree}, {"rm", remove_file},
+    //     {"ln", link}, {"uln", unlink}, {"send", send_file}, {"get", get_file},
+    //     {"ls", information}, {"cut", cut_file}, {"extend", extend_file}, {"create", create}
+    // };
+    // std::string function = std::string(argv[2]);
+    // for (auto f : functions){
+    //     if(function == f.first)
+    //         f.second(argc, argv);
+    // }
+    // help(argc, argv);
     return 0;
 }
