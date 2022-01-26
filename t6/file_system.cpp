@@ -389,7 +389,31 @@ public:
             last_datablock_idx = data_blocks[last_datablock_idx].offset;
 
         u_int64_t last_datablock_size = file->size % DATA_BLOCK_SIZE;
-        // TODO: DUZO ROBOTY TU JESZCZE
+        if(last_datablock_size > 0){
+            u_int64_t current_size_to_extend = DATA_BLOCK_SIZE - (file->size % DATA_BLOCK_SIZE);
+            if(current_size_to_extend > size_to_extend)
+                current_size_to_extend = size_to_extend;
+            memset(data_blocks[last_datablock_idx].data + last_datablock_size * sizeof(u_int8_t), 0, current_size_to_extend);
+            size_to_extend -= current_size_to_extend;
+            file->size += current_size_to_extend;
+        }
+        while(size_to_extend > 0){
+            data_blocks[last_datablock_idx].offset = get_empty_data_block();
+            if(data_blocks[last_datablock_idx].offset == -1){
+                std::cerr << "Invalid path";
+                exit(EXIT_FAILURE);
+            }
+            data_maps[data_blocks[last_datablock_idx].offset] = true;
+            u_int64_t new_size;
+            if(size_to_extend > DATA_BLOCK_SIZE)
+                new_size = DATA_BLOCK_SIZE;
+            else
+                new_size = size_to_extend;
+            memset(data_blocks[data_blocks[last_datablock_idx].offset].data, 0, new_size);
+            size_to_extend -= new_size;
+            file->size += new_size;
+            last_datablock_idx = data_blocks[last_datablock_idx].offset;
+        }
     }
 
 private:
@@ -666,15 +690,32 @@ int main(int argc, char* argv[]) {
     virtual_disc.create_link(direcotries, file, file_destinaiton, link_name);
 
     strcpy(direcotries, "a/x");
+     std::cout << virtual_disc.get_size(direcotries) << "\n";
+
+    strcpy(direcotries, "a/x");
     strcpy(file, "matejko");
-    virtual_disc.remove_link(direcotries, file);
+    virtual_disc.cut_file(direcotries, file, 2 );
+
+    strcpy(direcotries, "a/x");
+    std::cout << virtual_disc.get_size(direcotries) << "\n";
+
+
+    strcpy(direcotries, "a/x");
+    strcpy(file, "matejko");
+    virtual_disc.extend_file(direcotries, file, 58 );
+
+    strcpy(direcotries, "a/x");
+    std::cout << virtual_disc.get_size(direcotries) << "\n";
+
+
+
+    // strcpy(direcotries, "a/x");
+    // strcpy(file, "matejko");
+    // virtual_disc.remove_link(direcotries, file);
 
     strcpy(direcotries, "");
     strcpy(file, "a");
     virtual_disc.remove_link(direcotries, file);
-
-    strcpy(direcotries, "");
-    std::cout << virtual_disc.get_full_size(direcotries) << "\n";
 
     strcpy(direcotries, "");
     virtual_disc.show_files_tree(direcotries);
