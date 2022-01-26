@@ -630,6 +630,16 @@ private:
         }
     }
 
+    std::vector<std::string> split_pwd(std::string pwd){
+        std::vector<std::string> files;
+        size_t counter = 0;
+        while((counter = pwd.find("/")) != std::string::npos){
+            files.push_back(pwd.substr(0, counter));
+            pwd.erase(0, counter + 1);
+        }
+        files.push_back(pwd);
+        return files;
+    }
 };
 
 #pragma region user_interface
@@ -658,9 +668,6 @@ void unlink(int argc, char* argv[]){
 void send_file(int argc, char* argv[]){
 
 }
-void get_file(int argc, char* argv[]){
-
-}
 void information(int argc, char* argv[]){
 
 }
@@ -677,10 +684,43 @@ void create(int argc, char* argv[]){
 
 
 int main(int argc, char* argv[]) {
-    VirtualDisc virtual_disc;
-    virtual_disc.create((char*)"test", 1024*1024);
-    virtual_disc.open();
-    virtual_disc.close();
+    // VirtualDisc virtual_disc;
+    // virtual_disc.create((char*)"test", 1024*1024);
+    // virtual_disc.open();
+    // virtual_disc.close();
+    // char direcotries[80];
+    // char file[80];
+    // char file_destinaiton[80];
+    // char link_name[80];
+    // strcpy(direcotries, "a/x");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/y");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/z");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/x/k");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/x/l");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/x/m");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/z/q");
+    // virtual_disc.create_directory(direcotries);
+    // strcpy(direcotries, "a/z/w");
+    // virtual_disc.create_directory(direcotries);
+
+    // strcpy(direcotries, "a/x");
+    // strcpy(file, "matejko");
+    // virtual_disc.file_to_disc(direcotries, file);
+
+    // strcpy(direcotries, "a/x");
+    // strcpy(file, "matejko");
+    // strcpy(file_destinaiton, "matejko_out");
+    // virtual_disc.file_from_disc(direcotries, file, file_destinaiton);
+    // strcpy(direcotries, "");
+    // virtual_disc.show_files_tree(direcotries);
+
+
     // std::unordered_map<std::string, std::function<void(int, char**)>> functions {
     //     {"help", help}, {"mkdir", mkdir}, {"tree", tree}, {"rm", remove_file},
     //     {"ln", link}, {"uln", unlink}, {"send", send_file}, {"get", get_file},
