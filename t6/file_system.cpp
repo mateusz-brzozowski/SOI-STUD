@@ -320,7 +320,7 @@ public:
     u_int64_t get_left_space(){
         u_int64_t left_space = 0;
         for(int i = 0; i < data_blocks_length; i++)
-            if(data_maps[i] == 0)
+            if(data_maps[i] == false)
                 left_space += DATA_BLOCK_SIZE;
         return left_space;
     }
@@ -547,8 +547,10 @@ private:
     }
 
     void add_link_to_inode(INode* inode, DirectoryLink directory_link){
-        if(inode->data_block_index == -1)
+        if(inode->data_block_index == -1){
             inode->data_block_index = get_empty_data_block();
+            data_maps[inode->data_block_index] = true;
+        }
         u_int64_t current_data_block_idx = inode->data_block_index;
         bool is_place_for_link = false;
         while(!is_place_for_link){
