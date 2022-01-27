@@ -21,27 +21,41 @@ case $number_of_test in
     ./a.out $disc_name tree /
     ;;
     "3")
-    echo "Coping files from disc to virtual disc\n"
-    ./a.out $disc_name ls /
+    echo "Coping small file from disc to virtual disc\n"
+    ./a.out $disc_name ls a/x/l
     ./a.out $disc_name tree /
     ./a.out $disc_name send a/x/l matejko
-    ./a.out $disc_name ls a
+    ./a.out $disc_name ls a/x/l
+    ./a.out $disc_name tree /
+    ;;
+    "4")
+    echo "Coping small file from virtual disc to disc\n"
+    ./a.out $disc_name ls a/x/l
+    ./a.out $disc_name tree /
+    ./a.out $disc_name get a/x/l/matejko matejko_out
+    ./a.out $disc_name ls a/x/l
+    ./a.out $disc_name tree /
+    diff matejko matejko_out
+    ;;
+    "5")
+    echo "Coping large file from disc to virtual disc\n"
+    ./a.out $disc_name ls /
+    ./a.out $disc_name tree /
     ./a.out $disc_name send / tadek
     ./a.out $disc_name ls /
     ./a.out $disc_name tree /
     ;;
-    "4")
-    echo "Coping files from virtual disc to disc\n"
+    "6")
+    echo "Coping large file from virtual disc to disc\n"
     ./a.out $disc_name ls /
     ./a.out $disc_name tree /
-    ./a.out $disc_name get a/x/l/matejko matejko_out
     ./a.out $disc_name get tadek tadek_out
     ./a.out $disc_name ls /
     ./a.out $disc_name tree /
     diff matejko matejko_out
     diff tadek tadek_out
     ;;
-    "5")
+    "7")
     echo "Extending matejko file size\n"
     ./a.out $disc_name ls a
     ./a.out $disc_name tree /
@@ -49,7 +63,7 @@ case $number_of_test in
     ./a.out $disc_name ls a
     ./a.out $disc_name tree /
     ;;
-    "6")
+    "8")
     echo "Truncating matejko file size\n"
     ./a.out $disc_name ls a
     ./a.out $disc_name tree /
@@ -57,7 +71,7 @@ case $number_of_test in
     ./a.out $disc_name ls a
     ./a.out $disc_name tree /
     ;;
-    "7")
+    "9")
     echo "Createing link\n"
     ./a.out $disc_name tree /
     ./a.out $disc_name ln tadek a/y/tadek_link
@@ -65,15 +79,15 @@ case $number_of_test in
     ./a.out $disc_name ls b
     ./a.out $disc_name tree /
     ;;
-    "8")
-    echo "Removinf files\n"
+    "10")
+    echo "Removing files\n"
     ./a.out $disc_name ls /
     ./a.out $disc_name tree /
     ./a.out $disc_name rm tadek
     ./a.out $disc_name ls /
     ./a.out $disc_name rm a/x/l/matejko
-    ./a.out $disc_name ls a
     ./a.out $disc_name rm a/y/tadek_link
+    ./a.out $disc_name ls /
     ./a.out $disc_name tree /
     ;;
     *) echo "No test" ;;

@@ -112,18 +112,18 @@ public:
         file.write((char*)&super_block, sizeof(SuperBlock));
         file.write((char*)&root, sizeof(INode));
 
-        for(int i = 0; i < inodes_length - 1; i++){
+        for(u_int64_t i = 0; i < inodes_length - 1; i++){
             INode inode{};
             inode.data_block_index = -1;
             file.write((char*)&inode, sizeof(INode));
         }
 
-        for(int i = 0; i < data_maps_length; i++){
+        for(u_int64_t i = 0; i < data_maps_length; i++){
             unsigned int idx;
             file.write((char*)&idx, sizeof(bool));
         }
 
-        for(int i = 0; i < data_blocks_length; i++){
+        for(u_int64_t i = 0; i < data_blocks_length; i++){
             DataBlock data_block{};
             data_block.offset = -1;
             file.write((char*)&data_block, sizeof(DataBlock));
@@ -145,13 +145,13 @@ public:
         file.read((char*)&super_block, sizeof(SuperBlock));
         load_lengths(super_block);
         inodes = new INode[inodes_length];
-        for(int i = 0; i < inodes_length; i++)
+        for(u_int64_t i = 0; i < inodes_length; i++)
             file.read((char*)&inodes[i], sizeof(INode));
         data_maps = new bool[data_maps_length];
-        for(int i = 0; i < data_maps_length; i++)
+        for(u_int64_t i = 0; i < data_maps_length; i++)
             file.read((char*)&data_maps[i], sizeof(bool));
         data_blocks = new DataBlock[data_blocks_length];
-        for(int i = 0; i < data_blocks_length; i++)
+        for(u_int64_t i = 0; i < data_blocks_length; i++)
             file.read((char*)&data_blocks[i], sizeof(DataBlock));
         file.close();
         if(!file.good()){
@@ -167,11 +167,11 @@ public:
             exit(EXIT_FAILURE);
         }
         file.write((char*)&super_block, sizeof(SuperBlock));
-        for(int i = 0; i < inodes_length; i++)
+        for(u_int64_t i = 0; i < inodes_length; i++)
             file.write((char*)&inodes[i], sizeof(INode));
-        for(int i = 0; i < data_maps_length; i++)
+        for(u_int64_t i = 0; i < data_maps_length; i++)
             file.write((char*)&data_maps[i], sizeof(bool));
-        for(int i = 0; i < data_blocks_length; i++)
+        for(u_int64_t i = 0; i < data_blocks_length; i++)
             file.write((char*)&data_blocks[i], sizeof(DataBlock));
         file.close();
         if(!file.good()){
@@ -203,12 +203,12 @@ public:
                 inodes[new_inode_idx].reference_count = 1;
                 inodes[new_inode_idx].type = INodeType::DIRECTORY_NODE;
 
-                DirectoryLink new_directory_link{0};
+                DirectoryLink new_directory_link{};
                 new_directory_link.used = true;
                 new_directory_link.inode_id = new_inode_idx;
                 strncpy((char *)new_directory_link.name, current_directory_name.c_str(), NAME_LENGTH);
 
-                if(current_direcotry_inode->data_block_index == -1){
+                if(current_direcotry_inode->data_block_index == (u_int64_t)-1){
                     u_int64_t new_data_block_idx = get_empty_data_block();
                     current_direcotry_inode->data_block_index = new_data_block_idx;
                     *(DirectoryLink*)data_blocks[new_data_block_idx].data = new_directory_link;
@@ -249,7 +249,7 @@ public:
         inodes[new_inode_idx].type = INodeType::FILE_NODE;
         inodes[new_inode_idx].size = 0;
 
-        DirectoryLink new_file_link{0};
+        DirectoryLink new_file_link{};
         new_file_link.used = true;
         new_file_link.inode_id = new_inode_idx;
         strncpy((char *)new_file_link.name, file_name.c_str(), NAME_LENGTH);
@@ -264,10 +264,9 @@ public:
 
         inodes[new_inode_idx].data_block_index = get_empty_data_block();
         u_int64_t current_data_block_idx = inodes[new_inode_idx].data_block_index;
-        while(current_data_block_idx != -1){
+        while(current_data_block_idx != (u_int64_t)-1){
             unsigned left_size_in_block = 0;
             while(left_size_in_block < DATA_BLOCK_SIZE){
-                auto dupa = DATA_BLOCK_SIZE - left_size_in_block;
                 file.read((char*)&data_blocks[current_data_block_idx].data, DATA_BLOCK_SIZE - left_size_in_block);
                 if(!file.gcount() && file.eof()){
                     break;
@@ -295,19 +294,7 @@ public:
     }
 
     void file_from_disc(std::string pwd, std::string file_name_destination){
-        std::vector<std::string> path = split_pwd(pwd);
-        std::string file_name = path.back();
-        path.pop_back();
-        INode *direcotry_inode = get_direcotry_inode(path);
-        if(!direcotry_inode){
-            std::cerr << "Invalid path";
-            exit(EXIT_FAILURE);
-        }
-        INode *file= get_inode_in_inode(direcotry_inode, file_name);
-        if(!file){
-            std::cerr << "Missing file";
-            exit(EXIT_FAILURE);
-        }
+        INode* file = get_inode_by_pwd(pwd);
         std::ofstream file_destination(file_name_destination, std::ios::out | std::ios::binary);
         if(!file){
             std::cout << "Cannot open file";
@@ -315,10 +302,15 @@ public:
         }
         u_int64_t current_data_block_idx = file->data_block_index;
         u_int64_t left_size = file->size;
-        while(current_data_block_idx != -1){
+        u_int64_t current_size = 0;
+        while(current_data_block_idx != (u_int64_t)-1){
             u_int8_t *data = data_blocks[current_data_block_idx].data;
-            file_destination.write((char*)data, (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE));
-            left_size -= (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE);
+            if(left_size < DATA_BLOCK_SIZE)
+                current_size = left_size;
+            else
+                current_size = DATA_BLOCK_SIZE;
+            file_destination.write((char*)data, current_size);
+            left_size -= current_size;
             current_data_block_idx = data_blocks[current_data_block_idx].offset;
         }
         file_destination.close();
@@ -330,7 +322,7 @@ public:
 
     u_int64_t get_left_space(){
         u_int64_t left_space = 0;
-        for(int i = 0; i < data_blocks_length; i++)
+        for(u_int64_t i = 0; i < data_blocks_length; i++)
             if(data_maps[i] == false)
                 left_space += DATA_BLOCK_SIZE;
         return left_space;
@@ -341,9 +333,9 @@ public:
         INode *direcotry = get_direcotry_inode(path);
         u_int64_t size = 0;
         u_int64_t current_data_block_idx = direcotry->data_block_index;
-        while(current_data_block_idx != -1){
+        while(current_data_block_idx != (u_int64_t)-1){
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+            for(u_int64_t idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(direcotry_links[idx].used)
                    size += inodes[direcotry_links[idx].inode_id].size;
             }
@@ -360,36 +352,20 @@ public:
     }
 
     void create_link(std::string pwd, std::string link_pwd){
-        std::vector<std::string> path = split_pwd(pwd);
-        std::string file_name = path.back();
-        path.pop_back();
+        INode* file = get_inode_by_pwd(pwd);
         std::vector<std::string> link_path = split_pwd(link_pwd);
         std::string link_file_name = link_path.back();
         link_path.pop_back();
-
-        INode *direcotry_inode = get_direcotry_inode(path);
-        if(!direcotry_inode){
-            std::cerr << "Invalid path";
-            exit(EXIT_FAILURE);
-        }
-        INode *file= get_inode_in_inode(direcotry_inode, file_name);
-        if(!file){
-            std::cerr << "Missing file";
-            exit(EXIT_FAILURE);
-        }
         INode *link_directory_inode = get_direcotry_inode(link_path);
         if(!link_directory_inode){
             std::cerr << "Invalid path";
             exit(EXIT_FAILURE);
         }
-
         file->reference_count += 1;
-
         DirectoryLink new_file_link{};
         new_file_link.used = true;
         new_file_link.inode_id = file - inodes;
         strncpy((char *)new_file_link.name, link_file_name.c_str(), NAME_LENGTH);
-
         add_link_to_inode(link_directory_inode, new_file_link);
     }
 
@@ -421,25 +397,11 @@ public:
     }
 
     void cut_file(std::string pwd , size_t size_to_cut){
-        std::vector<std::string> path = split_pwd(pwd);
-        std::string file_name = path.back();
-        path.pop_back();
-        INode *direcotry_inode = get_direcotry_inode(path);
-        if(!direcotry_inode){
-            std::cerr << "Invalid path";
-            exit(EXIT_FAILURE);
-        }
-        INode *file= get_inode_in_inode(direcotry_inode, file_name);
-        if(!file){
-            std::cerr << "Missing file";
-            exit(EXIT_FAILURE);
-        }
-
+        INode* file = get_inode_by_pwd(pwd);
         if(file->size < size_to_cut){
             std::cerr << "Size to cut greater than file's size";
             exit(EXIT_FAILURE);
         }
-
         file->size -= size_to_cut;
         u_int64_t start_cut_block = file->size / DATA_BLOCK_SIZE;
         if(file->size % DATA_BLOCK_SIZE != 0)
@@ -451,29 +413,16 @@ public:
             data_block_idx = data_blocks[idx].offset;
         }
         clear_datablocks(data_block_idx);
-        if(prev_data_block_idx == -1)
+        if(prev_data_block_idx == (u_int64_t)-1)
             file->data_block_index = -1;
         else
             data_blocks[prev_data_block_idx].offset = -1;
     }
 
     void extend_file(std::string pwd, size_t size_to_extend){
-        std::vector<std::string> path = split_pwd(pwd);
-        std::string file_name = path.back();
-        path.pop_back();
-        INode *direcotry_inode = get_direcotry_inode(path);
-        if(!direcotry_inode){
-            std::cerr << "Invalid path";
-            exit(EXIT_FAILURE);
-        }
-        INode *file= get_inode_in_inode(direcotry_inode, file_name);
-        if(!file){
-            std::cerr << "Missing file";
-            exit(EXIT_FAILURE);
-        }
-
+        INode* file = get_inode_by_pwd(pwd);
         u_int64_t last_datablock_idx = file->data_block_index;
-        while(data_blocks[last_datablock_idx].offset != -1)
+        while(data_blocks[last_datablock_idx].offset != (u_int64_t)-1)
             last_datablock_idx = data_blocks[last_datablock_idx].offset;
 
         u_int64_t last_datablock_size = file->size % DATA_BLOCK_SIZE;
@@ -487,7 +436,7 @@ public:
         }
         while(size_to_extend > 0){
             data_blocks[last_datablock_idx].offset = get_empty_data_block();
-            if(data_blocks[last_datablock_idx].offset == -1){
+            if(data_blocks[last_datablock_idx].offset == (u_int64_t)-1){
                 std::cerr << "Invalid path";
                 exit(EXIT_FAILURE);
             }
@@ -509,6 +458,23 @@ private:
         if(name.length() >= NAME_LENGTH or name == "." or name == ".." or name == "/")
             return false;
         return true;
+    }
+
+    INode* get_inode_by_pwd(std::string pwd){
+        std::vector<std::string> path = split_pwd(pwd);
+        std::string file_name = path.back();
+        path.pop_back();
+        INode *direcotry_inode = get_direcotry_inode(path);
+        if(!direcotry_inode){
+            std::cerr << "Invalid path";
+            exit(EXIT_FAILURE);
+        }
+        INode *file= get_inode_in_inode(direcotry_inode, file_name);
+        if(!file){
+            std::cerr << "Missing file";
+            exit(EXIT_FAILURE);
+        }
+        return file;
     }
 
     u_int32_t get_empty_inode(){
@@ -542,9 +508,9 @@ private:
         if(direcotry->type != INodeType::DIRECTORY_NODE)
             return NULL;
         u_int64_t current_data_block_idx = direcotry->data_block_index;
-        while(current_data_block_idx != -1){
+        while(current_data_block_idx != (u_int64_t)-1){
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+            for(u_int64_t idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 DirectoryLink directory_link = direcotry_links[idx];
                 if((directory_link.used) && strcmp((char*)directory_link.name, name.c_str()) == 0)
                     return &direcotry_links[idx];
@@ -561,7 +527,7 @@ private:
     }
 
     void add_link_to_inode(INode* inode, DirectoryLink directory_link){
-        if(inode->data_block_index == -1){
+        if(inode->data_block_index == (u_int64_t)-1){
             inode->data_block_index = get_empty_data_block();
             data_maps[inode->data_block_index] = true;
         }
@@ -569,7 +535,7 @@ private:
         bool is_place_for_link = false;
         while(!is_place_for_link){
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+            for(u_int64_t idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(!direcotry_links[idx].used){
                     direcotry_links[idx] = directory_link;
                     is_place_for_link = true;
@@ -590,12 +556,7 @@ private:
 
     void remove_data_block_from_inode(INode* inode, u_int64_t data_block_idx){
         u_int64_t current_data_block_idx = inode->data_block_index;
-        // TODO: REMOVE THIS IF
-        if(current_data_block_idx == data_block_idx){
-            inode->data_block_index = -1;
-            return;
-        }
-        while(current_data_block_idx != -1){
+        while(current_data_block_idx != (u_int64_t)-1){
             if(current_data_block_idx == data_block_idx){
                 data_blocks[current_data_block_idx].offset = -1;
                 return;
@@ -625,9 +586,9 @@ private:
     u_int64_t get_size_inode(INode *direcotry){
         u_int64_t size = 0;
         u_int64_t current_data_block_idx = direcotry->data_block_index;
-        while(current_data_block_idx != -1){
+        while(current_data_block_idx != (u_int64_t)-1){
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+            for(u_int64_t idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(direcotry_links[idx].used){
                     if(std::find(shown_inodes.begin(),shown_inodes.end(), &inodes[direcotry_links[idx].inode_id]) != shown_inodes.end())
                         continue;
@@ -647,12 +608,12 @@ private:
         if(directory_inode->type != INodeType::DIRECTORY_NODE)
             return;
         u_int64_t current_data_block_idx = directory_inode->data_block_index;
-        while(current_data_block_idx != -1){
+        while(current_data_block_idx != (u_int64_t)-1){
             std::cout << "\n";
             for(int i = 0; i < rec_lvl; i++)
                 std::cout << "  ";
             DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-            for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+            for(u_int64_t idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                 if(!direcotry_links[idx].used)
                     continue;
                 if(std::find(shown_direcotry_links.begin(),shown_direcotry_links.end(), &direcotry_links[idx]) != shown_direcotry_links.end())
@@ -677,9 +638,9 @@ private:
             return;
         if(inode->type == INodeType::DIRECTORY_NODE){
             u_int64_t current_data_block_idx = inode->data_block_index;
-            while(current_data_block_idx != -1){
+            while(current_data_block_idx != (u_int64_t)-1){
                 DirectoryLink* direcotry_links = (DirectoryLink*)data_blocks[current_data_block_idx].data;
-                for(int idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
+                for(u_int64_t idx = 0; idx < DIRECTORY_LINKS_IN_DATA_BLOCK; idx++){
                     if(direcotry_links[idx].used){
                         remove_inode(&inodes[direcotry_links[idx].inode_id]);
                     }
@@ -697,7 +658,7 @@ private:
     void clear_datablocks(u_int64_t data_block_idx){
         std::vector<u_int64_t> data_blocks_idxs;
         u_int64_t idx = data_block_idx;
-        while(idx != -1){
+        while(idx != (u_int64_t)-1){
             data_blocks_idxs.push_back(idx);
             idx = data_blocks[idx].offset;
         }
@@ -727,6 +688,8 @@ private:
 VirtualDisc virtual_disc;
 
 void help(int argc, char* argv[]){
+    if (argc != 1)
+        return;
     std::cout << "Usage: "<< argv[0] << " \x1B[33mvirtual_disc_name \x1B[34mfunction\033[0m [function arguments]\n";
     std::cout << "-- \x1B[34mhelp\033[0m (show functions usage)\n";
     std::cout << "-- \x1B[34mcreate \x1B[33msize\033[0m (create virtual disc)\n";
@@ -804,30 +767,6 @@ void create(int argc, char* argv[]){
 
 
 int main(int argc, char* argv[]) {
-    // VirtualDisc virtual_disc;
-    // virtual_disc.create("test", 1024*1024);
-    // virtual_disc.open();
-    // virtual_disc.close();
-    // virtual_disc.open();
-    // virtual_disc.create_directory("a/x/k");
-    // virtual_disc.create_directory("a/x/l");
-    // virtual_disc.create_directory("a/x/m");
-    // virtual_disc.file_to_disc("a/x/k", "matejko");
-    // virtual_disc.file_from_disc("a/x/k/matejko", "matejko_out");
-    // virtual_disc.show_files_tree("/");
-    // std::cout << virtual_disc.get_left_space() << "\n";
-    // std::cout << virtual_disc.get_size("a") << "\n";
-    // std::cout << virtual_disc.get_full_size("a") << "\n";
-    // virtual_disc.create_link("a/x/k/matejko", "a/x/m/matejkolink");
-    // virtual_disc.create_link("a/x", "a/x/k/klink");
-    // std::cout << virtual_disc.get_size("a/x") << "\n";
-    // virtual_disc.show_files_tree("a");
-    // virtual_disc.cut_file("a/x/k/matejko", 3);
-    // std::cout << virtual_disc.get_size("a/x/k") << "\n";
-    // virtual_disc.extend_file("a/x/k/matejko", 53);
-    // std::cout << virtual_disc.get_size("a/x/k") << "\n";
-    // virtual_disc.show_information("a/x/k");
-    // virtual_disc.close();
     if(argc < 3){
         help(argc, argv);
         return -1;
