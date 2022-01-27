@@ -62,7 +62,7 @@ struct SuperBlock{
 
 
 class VirtualDisc{
-public:
+private:
     std::string name;
     FILE* file;
     INode *inodes;
@@ -268,9 +268,8 @@ public:
             unsigned left_size_in_block = 0;
             while(left_size_in_block < DATA_BLOCK_SIZE){
                 file.read((char*)&data_blocks[current_data_block_idx].data, DATA_BLOCK_SIZE - left_size_in_block);
-                if(!file.gcount() && file.eof()){
+                if(!file.gcount() && file.eof())
                     break;
-                }
                 else if (!file.gcount()){
                     std::cerr << "Invalid file";
                     exit(EXIT_FAILURE);
