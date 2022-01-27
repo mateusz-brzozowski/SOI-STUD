@@ -256,30 +256,33 @@ public:
 
         add_link_to_inode(direcotry_inode, new_file_link);
 
-        // TODO: CHAGE FOR CPP FUNCTION
-        FILE *file = fopen(file_name.c_str(), "rb+");
+        std::ifstream file(file_name, std::ios::out | std::ios::binary);
+        if(!file){
+            std::cout << "Cannot open file";
+            exit(EXIT_FAILURE);
+        }
 
         inodes[new_inode_idx].data_block_index = get_empty_data_block();
         u_int64_t current_data_block_idx = inodes[new_inode_idx].data_block_index;
         while(current_data_block_idx != -1){
             unsigned left_size_in_block = 0;
-            unsigned read_size = 0;
             while(left_size_in_block < DATA_BLOCK_SIZE){
-                read_size = fread(data_blocks[current_data_block_idx].data, 1, DATA_BLOCK_SIZE - left_size_in_block, file);
-                if(!read_size && feof(file)){
+                auto dupa = DATA_BLOCK_SIZE - left_size_in_block;
+                file.read((char*)&data_blocks[current_data_block_idx].data, DATA_BLOCK_SIZE - left_size_in_block);
+                if(!file.gcount() && file.eof()){
                     break;
                 }
-                else if (!read_size){
+                else if (!file.gcount()){
                     std::cerr << "Invalid file";
                     exit(EXIT_FAILURE);
                 }
-                left_size_in_block += read_size;
-                inodes[new_inode_idx].size += read_size;
+                left_size_in_block += file.gcount();
+                inodes[new_inode_idx].size += file.gcount();
             }
             if(!left_size_in_block){
                 remove_data_block_from_inode(&inodes[new_inode_idx], current_data_block_idx);
                 current_data_block_idx = -1;
-            } else if (feof(file)){
+            } else if (file.eof()){
                 data_maps[current_data_block_idx] = true;
                 data_blocks[current_data_block_idx].offset = -1;
                 current_data_block_idx = -1;
@@ -305,15 +308,23 @@ public:
             std::cerr << "Missing file";
             exit(EXIT_FAILURE);
         }
-        // TODO: CHAGE THIS SHIT
-        FILE *file_destination = fopen(file_name_destination.c_str(), "wb+");
+        std::ofstream file_destination(file_name_destination, std::ios::out | std::ios::binary);
+        if(!file){
+            std::cout << "Cannot open file";
+            exit(EXIT_FAILURE);
+        }
         u_int64_t current_data_block_idx = file->data_block_index;
         u_int64_t left_size = file->size;
         while(current_data_block_idx != -1){
             u_int8_t *data = data_blocks[current_data_block_idx].data;
-            fwrite(data, (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE), 1, file_destination);
+            file_destination.write((char*)data, (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE));
             left_size -= (left_size < DATA_BLOCK_SIZE ? left_size : DATA_BLOCK_SIZE);
             current_data_block_idx = data_blocks[current_data_block_idx].offset;
+        }
+        file_destination.close();
+        if(!file_destination.good()){
+            std::cout << "Writing to file error";
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -725,9 +736,6 @@ void help(int argc, char* argv[]){
     std::cout << "-- \x1B[34mcut \x1B[33mpath_to_file \x1B[32mbytes_amout\033[0m (truncate file's size)\n";
     std::cout << "-- \x1B[34mextend \x1B[33mpath_to_file \x1B[32mbytes_amout\033[0m (extend file's size)\n";
     std::cout << "-- \x1B[34mtree \x1B[33mpath_to_dictionary\033[0m (show dictionary tree)\n";
-
-
-
 }
 void mkdir(int argc, char* argv[]){
     if (argc != 4)
@@ -794,23 +802,16 @@ void create(int argc, char* argv[]){
 
 int main(int argc, char* argv[]) {
     // VirtualDisc virtual_disc;
-    // virtual_disc.create("test", 1024*1024);
-    // virtual_disc.open();
-    // virtual_disc.close();
-    // virtual_disc.open();
-    // virtual_disc.create_directory("a");
-    // virtual_disc.create_directory("b");
-    // virtual_disc.create_directory("c");
-    // virtual_disc.create_directory("a/x");
-    // virtual_disc.create_directory("a/y");
-    // virtual_disc.create_directory("a/x");
-    // virtual_disc.create_directory("a/x/k");
-    // virtual_disc.create_directory("a/x/l");
-    // virtual_disc.create_directory("a/x/m");
-    // virtual_disc.create_directory("a/z/q");
-    // virtual_disc.create_directory("a/z/w");
-    // virtual_disc.file_to_disc("a/x", "matejko");
-    // virtual_disc.file_from_disc("a/x/matejko", "matejko_out");
+    virtual_disc.create("test", 1024*1024);
+    virtual_disc.open();
+    virtual_disc.close();
+    virtual_disc.open();
+    virtual_disc.create_directory("a/x/k");
+    virtual_disc.create_directory("a/x/l");
+    virtual_disc.create_directory("a/x/m");
+    virtual_disc.file_to_disc("a/x/k", "matejko");
+    virtual_disc.file_from_disc("a/x/k/matejko", "matejko_out");
+    virtual_disc.show_files_tree("a");
     // std::cout << virtual_disc.get_left_space() << "\n";
     // std::cout << virtual_disc.get_size("a") << "\n";
     // std::cout << virtual_disc.get_full_size("a") << "\n";
@@ -823,28 +824,28 @@ int main(int argc, char* argv[]) {
     // virtual_disc.extend_file("a/x/matejko", 53);
     // std::cout << virtual_disc.get_size("a/x") << "\n";
     // virtual_disc.show_information("a/x");
-    // virtual_disc.close();
-    if(argc < 3){
-        help(argc, argv);
-        return -1;
-    }
-    std::unordered_map<std::string, std::function<void(int, char**)>> functions {
-        {"help", help}, {"mkdir", mkdir}, {"tree", tree}, {"rm", remove_file},
-        {"ln", link}, {"send", send_file}, {"get", get_file}, {"ls", information},
-        {"cut", cut_file}, {"extend", extend_file}, {"create", create}
-    };
-    virtual_disc.set_name(argv[1]);
-    std::string function = std::string(argv[2]);
-    for (auto f : functions){
-        if(function == f.first){
-            if(f.first != "create"){
-                virtual_disc.open();
-                f.second(argc, argv);
-                virtual_disc.close();
-            } else
-                f.second(argc, argv);
-        }
-    }
-    return 0;
+    virtual_disc.close();
+    // if(argc < 3){
+    //     help(argc, argv);
+    //     return -1;
+    // }
+    // std::unordered_map<std::string, std::function<void(int, char**)>> functions {
+    //     {"help", help}, {"mkdir", mkdir}, {"tree", tree}, {"rm", remove_file},
+    //     {"ln", link}, {"send", send_file}, {"get", get_file}, {"ls", information},
+    //     {"cut", cut_file}, {"extend", extend_file}, {"create", create}
+    // };
+    // virtual_disc.set_name(argv[1]);
+    // std::string function = std::string(argv[2]);
+    // for (auto f : functions){
+    //     if(function == f.first){
+    //         if(f.first != "create"){
+    //             virtual_disc.open();
+    //             f.second(argc, argv);
+    //             virtual_disc.close();
+    //         } else
+    //             f.second(argc, argv);
+    //     }
+    // }
+    // return 0;
 }
 // TODO: REPAIR
