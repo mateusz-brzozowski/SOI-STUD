@@ -394,9 +394,10 @@ public:
     }
 
     void show_information(std::string pwd){
-        std::cout << "Files size: " << get_size(pwd) << std::endl;
-        std::cout << "Full size: " << get_full_size(pwd) << std::endl;
-        std::cout << "Left space: " << get_left_space() << std::endl;
+        std::cout << "Information about: \x1B[34m" << pwd << "\033[0m\n";
+        std::cout << "Files size: \x1B[33m" << get_size(pwd) << "\033[0m\n";
+        std::cout << "Full size: \x1B[33m" << get_full_size(pwd) << "\033[0m\n";
+        std::cout << "Left space: \x1B[33m" << get_left_space() << "\033[0m\n";
     }
 
     void remove_link(std::string pwd){
@@ -529,6 +530,8 @@ private:
     }
 
     INode* get_inode_in_inode(INode *direcotry, std::string name){
+        if(name == "")
+            return direcotry;
         DirectoryLink *directory_link = get_direcotry_in_inode(direcotry, name);
         if(!directory_link)
             return NULL;
@@ -802,50 +805,49 @@ void create(int argc, char* argv[]){
 
 int main(int argc, char* argv[]) {
     // VirtualDisc virtual_disc;
-    virtual_disc.create("test", 1024*1024);
-    virtual_disc.open();
-    virtual_disc.close();
-    virtual_disc.open();
-    virtual_disc.create_directory("a/x/k");
-    virtual_disc.create_directory("a/x/l");
-    virtual_disc.create_directory("a/x/m");
-    virtual_disc.file_to_disc("a/x/k", "matejko");
-    virtual_disc.file_from_disc("a/x/k/matejko", "matejko_out");
-    virtual_disc.show_files_tree("a");
+    // virtual_disc.create("test", 1024*1024);
+    // virtual_disc.open();
+    // virtual_disc.close();
+    // virtual_disc.open();
+    // virtual_disc.create_directory("a/x/k");
+    // virtual_disc.create_directory("a/x/l");
+    // virtual_disc.create_directory("a/x/m");
+    // virtual_disc.file_to_disc("a/x/k", "matejko");
+    // virtual_disc.file_from_disc("a/x/k/matejko", "matejko_out");
+    // virtual_disc.show_files_tree("/");
     // std::cout << virtual_disc.get_left_space() << "\n";
     // std::cout << virtual_disc.get_size("a") << "\n";
     // std::cout << virtual_disc.get_full_size("a") << "\n";
-    // virtual_disc.create_link("a/x/matejko", "a/z/w/matejkolink");
+    // virtual_disc.create_link("a/x/k/matejko", "a/x/m/matejkolink");
     // virtual_disc.create_link("a/x", "a/x/k/klink");
     // std::cout << virtual_disc.get_size("a/x") << "\n";
     // virtual_disc.show_files_tree("a");
-    // virtual_disc.cut_file("a/x/matejko", 3);
-    // std::cout << virtual_disc.get_size("a/x") << "\n";
-    // virtual_disc.extend_file("a/x/matejko", 53);
-    // std::cout << virtual_disc.get_size("a/x") << "\n";
-    // virtual_disc.show_information("a/x");
-    virtual_disc.close();
-    // if(argc < 3){
-    //     help(argc, argv);
-    //     return -1;
-    // }
-    // std::unordered_map<std::string, std::function<void(int, char**)>> functions {
-    //     {"help", help}, {"mkdir", mkdir}, {"tree", tree}, {"rm", remove_file},
-    //     {"ln", link}, {"send", send_file}, {"get", get_file}, {"ls", information},
-    //     {"cut", cut_file}, {"extend", extend_file}, {"create", create}
-    // };
-    // virtual_disc.set_name(argv[1]);
-    // std::string function = std::string(argv[2]);
-    // for (auto f : functions){
-    //     if(function == f.first){
-    //         if(f.first != "create"){
-    //             virtual_disc.open();
-    //             f.second(argc, argv);
-    //             virtual_disc.close();
-    //         } else
-    //             f.second(argc, argv);
-    //     }
-    // }
-    // return 0;
+    // virtual_disc.cut_file("a/x/k/matejko", 3);
+    // std::cout << virtual_disc.get_size("a/x/k") << "\n";
+    // virtual_disc.extend_file("a/x/k/matejko", 53);
+    // std::cout << virtual_disc.get_size("a/x/k") << "\n";
+    // virtual_disc.show_information("a/x/k");
+    // virtual_disc.close();
+    if(argc < 3){
+        help(argc, argv);
+        return -1;
+    }
+    std::unordered_map<std::string, std::function<void(int, char**)>> functions {
+        {"help", help}, {"mkdir", mkdir}, {"tree", tree}, {"rm", remove_file},
+        {"ln", link}, {"send", send_file}, {"get", get_file}, {"ls", information},
+        {"cut", cut_file}, {"extend", extend_file}, {"create", create}
+    };
+    virtual_disc.set_name(argv[1]);
+    std::string function = std::string(argv[2]);
+    for (auto f : functions){
+        if(function == f.first){
+            if(f.first != "create"){
+                virtual_disc.open();
+                f.second(argc, argv);
+                virtual_disc.close();
+            } else
+                f.second(argc, argv);
+        }
+    }
+    return 0;
 }
-// TODO: REPAIR
