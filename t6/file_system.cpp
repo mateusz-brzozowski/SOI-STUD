@@ -687,8 +687,6 @@ private:
 VirtualDisc virtual_disc;
 
 void help(int argc, char* argv[]){
-    if (argc != 1)
-        return;
     std::cout << "Usage: "<< argv[0] << " \x1B[33mvirtual_disc_name \x1B[34mfunction\033[0m [function arguments]\n";
     std::cout << "-- \x1B[34mhelp\033[0m (show functions usage)\n";
     std::cout << "-- \x1B[34mcreate \x1B[33msize\033[0m (create virtual disc)\n";
